@@ -187,7 +187,7 @@
         <label class="muted">المشهد<select id="addScene" class="field"></select></label>
         <label class="muted">صاحبة الصوت<input id="addBy" class="field" placeholder="مثال: سارة"></label>
         <label class="pick">📂 اختيار الملف<input id="addFile" type="file" accept="audio/*,.m4a,.mp3,.wav,.aac,.ogg,.opus,.webm,.mp4" multiple></label>
-        <p class="muted" style="margin:0">يُحفظ في الصفحة، ويُرفع للمزامنة ورابط المشاركة إذا كانت المزامنة مربوطة.</p>
+        <p class="muted" style="margin:0">إذا كان اسم الملف مثل «09_سارة» يُعرف المشهد وصاحبة الصوت تلقائيًا، ويمكن اختيار عدة ملفات معًا. يُحفظ في الصفحة، ويُرفع للمزامنة ورابط المشاركة إذا كانت المزامنة مربوطة.</p>
       </div>
     </details>
     <div id="takes"><p class="muted">لا توجد تسجيلات بعد.</p></div>
@@ -507,7 +507,7 @@ function takeEl(rec,s){
   if(del)del.onclick=()=>{
     if(!el._c){el._c=true;del.textContent='اضغطي مرة ثانية للتأكيد';setTimeout(()=>{el._c=false;del.textContent='🗑 حذف'},3000);return}
     removeLocal(rec.id);renderAll();if(sync&&rec.synced)queue(()=>removeRemote(rec));toast('حُذف التسجيل')};
-  el.querySelector('[data-a=dl]').onclick=async()=>{const f=(nm.value||s.id).trim()+'.'+extFor(blob.type||rec.type);
+  el.querySelector('[data-a=dl]').onclick=async()=>{const base=(nm.value||s.id).trim();const f=base+(rec.by&&!base.includes(rec.by)?'_'+rec.by:'')+'.'+extFor(blob.type||rec.type);
     if(downloads){try{await downloads.save({filename:f,data:blob});toast('تم الحفظ ✓')}catch(e){toast(e?.code==='declined'?'تم إلغاء الحفظ':'تعذّر الحفظ')}}
     else{const a=document.createElement('a');a.href=urlFor(rec.id);a.download=f;document.body.appendChild(a);a.click();a.remove()}};
   return el;
@@ -539,8 +539,11 @@ $('myName').onchange=()=>{try{localStorage.setItem('studio-me',$('myName').value
 $('addFile').onchange=async e=>{
   const files=[...e.target.files];e.target.value='';if(!files.length)return;
   const by=$('addBy').value.trim(),sc=$('addScene').value;try{localStorage.setItem('studio-lastby',by)}catch(x){}
-  for(const f of files){const ms=await new Promise(res=>{const a=new Audio(URL.createObjectURL(f));a.onloadedmetadata=()=>res(isFinite(a.duration)?a.duration*1000:0);a.onerror=()=>res(0);setTimeout(()=>res(0),4000)});await addTake(f,ms,sc,by)}
-  toast('أُضيف '+files.length+' تسجيل للمشهد '+sc+(by?' بصوت '+by:''));
+  for(const f of files){
+    const m=f.name.replace(/\.[^.]+$/,'').match(/^(\d{2})(?:_\d+)?(?:_(.+))?$/);
+    const scF=m&&SCENES.find(x=>x.id===m[1])?m[1]:sc, byF=(m&&m[2])?m[2].trim():by;
+    const ms=await new Promise(res=>{const a=new Audio(URL.createObjectURL(f));a.onloadedmetadata=()=>res(isFinite(a.duration)?a.duration*1000:0);a.onerror=()=>res(0);setTimeout(()=>res(0),4000)});await addTake(f,ms,scF,byF)}
+  toast('أُضيف '+files.length+' تسجيل ✓');
 };
 const LISTEN_URL=location.origin+location.pathname+'#listen';
 function applyMode(){document.body.classList.toggle('listen',location.hash==='#listen');if(window._ready&&typeof renderAll==='function')renderAll()}
