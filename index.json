@@ -238,5 +238,15 @@
   "created": 1794332927693,
   "by": "",
   "path": "recordings/1794332927693-z9cye6.webm"
+ },
+ {
+  "id": "1794332939019-w86rup",
+  "scene": "02",
+  "name": "02_6",
+  "ms": 3483,
+  "type": "audio/webm; codecs=opus",
+  "created": 1794332939019,
+  "by": "",
+  "path": "recordings/1794332939019-w86rup.webm"
  }
 ]
