@@ -110,6 +110,9 @@
   .pick input{display:none}
   .by{font-size:12px;color:var(--accent2)}
   body.listen .addbox{display:none}
+  .invite-bar{display:none;border-color:var(--accent2)}
+  body.invited .invite-bar{display:block}
+  body.invited .share-bar,body.invited #syncBox,body.invited #syncBadge{display:none}
   details summary{cursor:pointer;color:var(--muted);font-size:13px}
 </style>
 </head>
@@ -119,6 +122,10 @@
     <h1>🎙️ استديو التسجيل<small>رحلة ريال واحد — نموذج المدخلات والمخرجات</small></h1>
     <div id="onair" class="onair">ON AIR</div>
   </header>
+  <section class="panel invite-bar" id="inviteBar">
+    <p style="margin:0 0 8px">👋 أهلًا! تسجيلاتك تُرسل تلقائيًا إلى جمانه. اكتبي اسمك أولًا عشان يوصل كل تسجيل باسمك:</p>
+    <input id="inviteName" class="field" placeholder="اسمك">
+  </section>
   <section class="panel share-bar" id="shareBar">
     <div class="row" style="justify-content:space-between"><span class="muted">🔗 رابط الاستماع لمن تريدين مشاركته</span><button id="shareBtn" class="primary">نسخ رابط المشاركة</button></div>
     <p class="muted" id="shareMsg" style="margin-top:6px"></p>
@@ -201,6 +208,13 @@
         <input id="syncToken" class="field" dir="ltr" type="password" placeholder="github_pat_...">
         <div class="row"><button id="syncSave" class="primary">ربط</button><button id="syncNow">تحديث الآن</button><button id="syncOff">فصل هذا الجهاز</button></div>
         <p class="muted" id="syncMsg"></p>
+        <hr style="border:0;border-top:1px solid var(--line);width:100%">
+        <b style="font-size:14px">📥 صندوق البنات (بدون حسابات)</b>
+        <p class="muted" style="margin:0">رمز خاص لمستودع studio-inbox فقط. البنات يسجّلن من رابط الدعوة، وتسجيلاتهن تنتقل إلى قائمتك ورابط المشاركة عند كل تحديث.</p>
+        <input id="inboxRepo" class="field" dir="ltr" value="3jomanh1426-maker/studio-inbox">
+        <input id="inboxToken" class="field" dir="ltr" type="password" placeholder="github_pat_... (رمز صندوق البنات)">
+        <div class="row"><button id="inboxSave" class="primary">حفظ وإنشاء رابط الدعوة</button><button id="inboxCopy">نسخ رابط الدعوة</button></div>
+        <p class="muted" id="inboxMsg"></p>
       </div>
     </details>
   </section>
@@ -428,6 +442,7 @@ function runClock(){clearInterval(tick);tick=setInterval(()=>{const ms=elapsed+(
   if(s>cur.max&&!t._warned){t._warned=true;toast('تجاوزتِ أقصى مدة للمشهد ('+cur.max+' ث)')}},100)}
 let isRunning=false;const running=()=>isRunning;
 function startRec(){
+  if(invite&&!(localStorage.getItem('studio-me')||'').trim()){toast('اكتبي اسمك أولًا فوق');$('inviteName').focus();window.scrollTo(0,0);return}
   const m=pickMime();try{recorder=new MediaRecorder(stream,m?{mimeType:m,audioBitsPerSecond:128000}:undefined)}catch(e){toast('المتصفح لا يدعم التسجيل');return}
   if($('checkOn').checked&&(dict||SR))startListen();
   resetChecker();chunks=[];elapsed=0;$('timer')._warned=false;
@@ -477,7 +492,7 @@ async function addTake(blob,ms,sceneId,by){
   blobs[rec.id]=blob;recs.push(rec);regroup();renderAll();
   toast('✅ تم تسجيل المشهد '+s.id);
   try{await saveLocal(rec)}catch(e){toast('تعذّر الحفظ في الصفحة — نزّلي التسجيل')}
-  if(sync)queue(()=>upload(rec));
+  if(sync)queue(()=>upload(rec));else if(invite)queue(()=>sendInbox(rec));
 }
 const urls={};
 function urlFor(id){return urls[id]||(urls[id]=URL.createObjectURL(blobs[id]))}
@@ -499,7 +514,7 @@ function takeEl(rec,s){
   const el=document.createElement('div');el.className='take';
   const ms=rec.ms,over=ms&&ms/1000>s.max,blob=blobs[rec.id];
   const date=new Date(rec.created).toLocaleString('ar-SA',{day:'numeric',month:'short',hour:'numeric',minute:'2-digit'});
-  const cloud=rec.readonly?'<span class="cloud ok">🌐 منشور</span>':!sync?'<span class="cloud">📱 على هذا الجهاز</span>':rec.synced?'<span class="cloud ok">☁️ على كل الأجهزة</span>':'<span class="cloud bad">⏳ لم يُرفع بعد</span>';
+  const cloud=invite&&!rec.readonly?(rec.sent?'<span class="cloud ok">📤 وصل لجمانه</span>':'<span class="cloud bad">⏳ يُرسل…</span>'):rec.readonly?'<span class="cloud ok">🌐 منشور</span>':!sync?'<span class="cloud">📱 على هذا الجهاز</span>':rec.synced?'<span class="cloud ok">☁️ على كل الأجهزة</span>':'<span class="cloud bad">⏳ لم يُرفع بعد</span>';
   el.innerHTML=`<div class="take-head"><input class="take-name"><small class="${over?'over':''}">${ms?fmt(ms)+' / '+fmtS(s.max):''}${over?' ⚠️':''}</small></div><div class="row" style="justify-content:space-between"><small style="color:var(--muted)">${rec.by?'<span class="by">🎙️ بصوت: '+rec.by.replace(/</g,'&lt;')+'</span> · ':''}${date}</small>${cloud}</div><audio controls preload="metadata" src="${urlFor(rec.id)}"></audio><div class="row take-actions"><button data-a="dl">⬇️ تنزيل</button><button data-a="del">🗑 حذف</button></div>`;
   const nm=el.querySelector('.take-name');nm.value=rec.name;if(rec.readonly){nm.readOnly=true;el.querySelector('[data-a=del]').remove()}
   nm.onchange=()=>{rec.name=nm.value.trim()||rec.scene;saveMeta(rec);if(sync&&rec.synced)queue(()=>indexEdit(ix=>{const e=ix.find(x=>x.id===rec.id);if(e)e.name=rec.name}))};
@@ -516,7 +531,7 @@ function removeLocal(id){recs=recs.filter(r=>r.id!==id);if(urls[id]){URL.revokeO
 async function loadSaved(){
   try{const all=(await dbAll()).sort((a,b)=>a.created-b.created);all.forEach(r=>{blobs[r.id]=new Blob([r.buf],{type:r.type});delete r.buf;recs.push(r)});regroup();renderAll();
     if(navigator.storage?.persist)navigator.storage.persist().catch(()=>{})}catch(e){renderAll()}
-  if(sync)pull();else pullPublic();
+  if(sync)pull();else{pullPublic();if(invite)recs.filter(r=>!r.sent&&!r.readonly).forEach(r=>queue(()=>sendInbox(r)))}
 }
 const PUBLIC_REPO='3jomanh1426-maker/Studio-';
 async function pullPublic(){
@@ -556,10 +571,19 @@ $('shareBtn').onclick=async()=>{
 
 /* ===== المزامنة عبر GitHub ===== */
 let sync=null;try{sync=JSON.parse(localStorage.getItem('studio-sync')||'null');if(sync&&/studio-recordings$/i.test(sync.repo)){sync.repo='3jomanh1426-maker/Studio-';localStorage.setItem('studio-sync',JSON.stringify(sync))}}catch(e){}
+let invite=null,inbox=null;
+try{
+  if(location.hash.startsWith('#invite=')){const v=decodeURIComponent(location.hash.slice(8));const i=v.lastIndexOf(':');invite={repo:v.slice(0,i),token:v.slice(i+1)};localStorage.setItem('studio-invite',JSON.stringify(invite));history.replaceState(null,'',location.pathname)}
+  else invite=JSON.parse(localStorage.getItem('studio-invite')||'null');
+  inbox=JSON.parse(localStorage.getItem('studio-inboxcfg')||'null');
+}catch(e){}
+if(sync)invite=null; // صاحبة الاستديو لا تحتاج رابط الدعوة
+document.body.classList.toggle('invited',!!invite);
 let chain=Promise.resolve();const queue=fn=>chain=chain.then(fn).catch(e=>{setSync('bad','تعذّرت المزامنة: '+e.message)});
 function setSync(state,msg){const b=$('syncBadge');b.className='badge'+(state==='ok'?' on':'');b.textContent=state==='ok'?'☁️ متزامن':state==='busy'?'⏳ يزامن…':state==='bad'?'⚠️ مشكلة في المزامنة':'📱 هذا الجهاز فقط';if(msg)$('syncMsg').textContent=msg}
-async function gh(path,{method='GET',body,raw}={}){
-  const r=await fetch('https://api.github.com/repos/'+sync.repo+path,{method,headers:{Authorization:'Bearer '+sync.token,Accept:raw?'application/vnd.github.raw+json':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'},body:body?JSON.stringify(body):undefined,cache:'no-store'});
+async function gh(path,{method='GET',body,raw,cfg}={}){
+  cfg=cfg||sync;
+  const r=await fetch('https://api.github.com/repos/'+cfg.repo+path,{method,headers:{Authorization:'Bearer '+cfg.token,Accept:raw?'application/vnd.github.raw+json':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'},body:body?JSON.stringify(body):undefined,cache:'no-store'});
   if(r.status===404)return null;
   if(r.status===401)throw new Error('الرمز غير صالح أو انتهت صلاحيته');
   if(r.status===403)throw new Error('الرمز لا يملك صلاحية الكتابة على المستودع');
@@ -585,6 +609,33 @@ async function removeRemote(rec){
   if(path){const r=await gh('/contents/'+path);if(r){const j=await r.json();await gh('/contents/'+path,{method:'DELETE',body:{message:'حذف تسجيل',sha:j.sha}})}}
   setSync('ok');
 }
+async function sendInbox(rec){
+  if(!rec.by){rec.by=(localStorage.getItem('studio-me')||'').trim();}
+  const base='/contents/inbox/'+rec.id;
+  if(!await gh(base+'.'+extFor(rec.type),{cfg:invite}))await gh(base+'.'+extFor(rec.type),{cfg:invite,method:'PUT',body:{message:'تسجيل '+rec.scene+' — '+(rec.by||''),content:b64(await blobs[rec.id].arrayBuffer())}});
+  const meta={id:rec.id,scene:rec.scene,name:rec.name,ms:rec.ms,type:rec.type,created:rec.created,by:rec.by||''};
+  if(!await gh(base+'.json',{cfg:invite}))await gh(base+'.json',{cfg:invite,method:'PUT',body:{message:'بيانات التسجيل',content:enc(JSON.stringify(meta))}});
+  rec.sent=true;await saveMeta(rec);renderAll();toast('📤 وصل تسجيل المشهد '+rec.scene+' لجمانه');
+}
+async function importInbox(){
+  if(!inbox)return 0;
+  const r=await gh('/contents/inbox',{cfg:inbox});if(!r)return 0;
+  const items=await r.json();let n=0;
+  for(const it of items.filter(x=>x.name.endsWith('.json'))){
+    const id=it.name.slice(0,-5);const audio=items.find(x=>x.name.startsWith(id+'.')&&!x.name.endsWith('.json'));if(!audio)continue;
+    const mj=await (await gh('/contents/'+it.path,{cfg:inbox})).json();const meta=JSON.parse(dec(mj.content));
+    if(!recs.find(x=>x.id===meta.id)){
+      const ar=await gh('/contents/'+audio.path,{cfg:inbox,raw:true});if(!ar)continue;
+      const rec={...meta,synced:false};blobs[rec.id]=new Blob([await ar.arrayBuffer()],{type:meta.type});recs.push(rec);regroup();renderAll();
+      try{await saveLocal(rec)}catch(x){}
+      await upload(rec);n++;
+    }
+    await gh('/contents/'+audio.path,{cfg:inbox,method:'DELETE',body:{message:'نُقل',sha:audio.sha}});
+    await gh('/contents/'+it.path,{cfg:inbox,method:'DELETE',body:{message:'نُقل',sha:it.sha}});
+  }
+  if(n)toast('📥 وصلت '+n+' تسجيلات من البنات');
+  return n;
+}
 function pull(){return queue(async()=>{
   setSync('busy');
   const {list}=await getIndex();const ids=new Set(list.map(x=>x.id));
@@ -598,6 +649,7 @@ function pull(){return queue(async()=>{
   }
   regroup();renderAll();
   for(const r of recs.filter(r=>!r.synced))await upload(r); // ما سُجّل قبل الربط أو تعذّر رفعه
+  try{await importInbox()}catch(e){$('inboxMsg').textContent='تعذّر فتح صندوق البنات: '+e.message}
   setSync('ok','آخر مزامنة: '+new Date().toLocaleTimeString('ar-SA',{hour:'numeric',minute:'2-digit'}));
 })}
 $('syncSave').onclick=async()=>{
@@ -609,7 +661,22 @@ $('syncSave').onclick=async()=>{
   }catch(e){sync=null;setSync('off',e.message)}
 };
 function confirmPublic(){if($('syncSave')._pub)return true;$('syncSave')._pub=true;$('syncMsg').textContent='⚠️ هذا المستودع عام: أي أحد يقدر يسمع تسجيلاتك. اجعليه Private، أو اضغطي «ربط» مرة ثانية للمتابعة.';sync=null;return false}
-$('syncBadge').onclick=()=>$('syncNow').onclick();$('syncNow').onclick=()=>{if(!sync){$('syncBox').open=true;$('syncMsg').textContent='اربطي المزامنة أولًا';return}pull()};
+$('syncBadge').onclick=()=>$('syncNow').onclick();function inviteLink(){return location.origin+location.pathname+'#invite='+encodeURIComponent(inbox.repo+':'+inbox.token)}
+async function shareInvite(){const u=inviteLink();$('inboxMsg').innerHTML='رابط الدعوة جاهز ✓ أرسليه لقروب البنات فقط. لا ترسلينه لأحد غيرهن.';try{await navigator.clipboard.writeText(u);toast('نُسخ رابط الدعوة ✓')}catch(e){}if(navigator.share)navigator.share({title:'استديو التسجيل',text:'سجّلي مشهدك من هنا:',url:u}).catch(()=>{})}
+$('inboxSave').onclick=async()=>{
+  const repo=$('inboxRepo').value.trim(),token=$('inboxToken').value.trim();
+  if(!/^[\w.-]+\/[\w.-]+$/.test(repo)||!token){$('inboxMsg').textContent='أدخلي اسم المستودع ورمز الصندوق';return}
+  if(sync&&token===sync.token){$('inboxMsg').textContent='⚠️ هذا رمزك الأساسي. سوّي رمزًا جديدًا خاصًا بمستودع studio-inbox فقط.';return}
+  $('inboxMsg').textContent='جارٍ التحقق…';
+  try{const r=await gh('',{cfg:{repo,token}});if(!r)throw new Error('لم أجد المستودع، تأكدي من الاسم ومن أن الرمز يشمله');const j=await r.json();if(!j.permissions?.push)throw new Error('الرمز لا يملك صلاحية Contents: Read and write');
+    inbox={repo,token};localStorage.setItem('studio-inboxcfg',JSON.stringify(inbox));$('inboxToken').value='';shareInvite();
+  }catch(e){$('inboxMsg').textContent=e.message}
+};
+$('inboxCopy').onclick=()=>{if(!inbox){$('inboxMsg').textContent='احفظي رمز الصندوق أولًا';return}shareInvite()};
+if(inbox)$('inboxMsg').textContent='صندوق البنات مربوط ✓';
+try{$('inviteName').value=localStorage.getItem('studio-me')||''}catch(e){}
+$('inviteName').onchange=()=>{const v=$('inviteName').value.trim();try{localStorage.setItem('studio-me',v)}catch(e){};$('myName').value=v;toast('أهلًا '+v+' 🌷')};
+$('syncNow').onclick=()=>{if(!sync){$('syncBox').open=true;$('syncMsg').textContent='اربطي المزامنة أولًا';return}pull()};
 $('syncOff').onclick=()=>{localStorage.removeItem('studio-sync');sync=null;setSync('off','فُصل هذا الجهاز. تسجيلاتك تبقى عليه وعلى المستودع.');renderAll()};
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&sync&&!isBusy())pull()});
 setSync(sync?'ok':'off');
