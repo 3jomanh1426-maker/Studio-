@@ -128,5 +128,15 @@
   "created": 1794330347696,
   "by": "دانا",
   "path": "recordings/1794330347696-pc0jbg.webm"
+ },
+ {
+  "id": "1794330370430-fnp3bd",
+  "scene": "05",
+  "name": "05_2",
+  "ms": 39842,
+  "type": "audio/webm;codecs=opus",
+  "created": 1794330370430,
+  "by": "العنود الصيدلاني",
+  "path": "recordings/1794330370430-fnp3bd.webm"
  }
 ]
