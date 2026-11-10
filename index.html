@@ -581,7 +581,7 @@ try{
 if(sync)invite=null; // صاحبة الاستديو لا تحتاج رابط الدعوة
 document.body.classList.toggle('invited',!!invite);
 let chain=Promise.resolve();const queue=fn=>chain=chain.then(fn).catch(e=>{setSync('bad','تعذّرت المزامنة: '+e.message)});
-function setSync(state,msg){if(state==='bad'){toast(msg||'مشكلة في المزامنة');$('syncLine').innerHTML='<span style="color:var(--accent)">⚠️ '+(msg||'')+'</span>'}else if(state==='ok'&&sync)$('syncLine').textContent='☁️ مربوط بـ '+sync.repo+(inbox?' · 📥 صندوق البنات مربوط':'')+' · نسخة 9';else if(invite)$('syncLine').textContent='📤 مربوطة بصندوق جمانه · نسخة 9';else $('syncLine').textContent='📱 المزامنة غير مربوطة على هذا الجهاز · نسخة 9';const b=$('syncBadge');b.className='badge'+(state==='ok'?' on':'');b.textContent=state==='ok'?'☁️ متزامن':state==='busy'?'⏳ يزامن…':state==='bad'?'⚠️ مشكلة في المزامنة':'📱 هذا الجهاز فقط';if(msg)$('syncMsg').textContent=msg}
+function setSync(state,msg){if(state==='bad'){toast(msg||'مشكلة في المزامنة');$('syncLine').innerHTML='<span style="color:var(--accent)">⚠️ '+(msg||'')+'</span>'}else if(state==='ok'&&sync)$('syncLine').textContent='☁️ مربوط بـ '+sync.repo+(inbox?' · 📥 صندوق البنات مربوط':'')+' · نسخة 10';else if(invite)$('syncLine').textContent='📤 مربوطة بصندوق جمانه · نسخة 10';else $('syncLine').textContent='📱 المزامنة غير مربوطة على هذا الجهاز · نسخة 10';const b=$('syncBadge');b.className='badge'+(state==='ok'?' on':'');b.textContent=state==='ok'?'☁️ متزامن':state==='busy'?'⏳ يزامن…':state==='bad'?'⚠️ مشكلة في المزامنة':'📱 هذا الجهاز فقط';if(msg)$('syncMsg').textContent=msg}
 async function gh(path,{method='GET',body,raw,cfg}={}){
   cfg=cfg||sync;
   const r=await fetch('https://api.github.com/repos/'+cfg.repo+path,{method,headers:{Authorization:'Bearer '+cfg.token,Accept:raw?'application/vnd.github.raw+json':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'},body:body?JSON.stringify(body):undefined,cache:'no-store'});
@@ -595,6 +595,7 @@ async function gh(path,{method='GET',body,raw,cfg}={}){
 function b64(buf){const u=new Uint8Array(buf);let s='';for(let i=0;i<u.length;i+=0x8000)s+=String.fromCharCode.apply(null,u.subarray(i,i+0x8000));return btoa(s)}
 const enc=t=>b64(new TextEncoder().encode(t));
 const dec=c=>new TextDecoder().decode(Uint8Array.from(atob(c.replace(/\n/g,'')),ch=>ch.charCodeAt(0)));
+async function writeTest(cfg){const p='/contents/.studio-test-'+Date.now()+'.txt';await gh(p,{cfg,method:'PUT',body:{message:'اختبار الصلاحية',content:enc('ok')}});const r=await gh(p,{cfg});if(r){const j=await r.json();await gh(p,{cfg,method:'DELETE',body:{message:'اختبار الصلاحية',sha:j.sha}})}}
 async function getIndex(){const r=await gh('/contents/index.json');if(!r)return{list:[],sha:undefined};const j=await r.json();return{list:JSON.parse(dec(j.content)),sha:j.sha}}
 async function indexEdit(fn){for(let t=0;t<3;t++){const {list,sha}=await getIndex();fn(list);try{await gh('/contents/index.json',{method:'PUT',body:{message:'تحديث قائمة التسجيلات',content:enc(JSON.stringify(list,null,1)),sha}});return list}catch(e){if(t===2)throw e}}}
 async function upload(rec){
@@ -671,6 +672,7 @@ $('inboxSave').onclick=async()=>{
   if(sync&&token===sync.token){$('inboxMsg').textContent='⚠️ هذا رمزك الأساسي. سوّي رمزًا جديدًا خاصًا بمستودع studio-inbox فقط.';return}
   $('inboxMsg').textContent='جارٍ التحقق…';
   try{const r=await gh('',{cfg:{repo,token}});if(!r)throw new Error('لم أجد المستودع، تأكدي من الاسم ومن أن الرمز يشمله');const j=await r.json();if(!j.permissions?.push)throw new Error('الرمز لا يملك صلاحية Contents: Read and write');
+    try{await writeTest({repo,token})}catch(e){throw new Error('الرمز لا يملك صلاحية الكتابة. في GitHub افتحي الرمز ← Add permissions ← Contents ← Read and write ← Update')}
     inbox={repo,token};localStorage.setItem('studio-inboxcfg',JSON.stringify(inbox));$('inboxToken').value='';shareInvite();
   }catch(e){$('inboxMsg').textContent=e.message}
 };
