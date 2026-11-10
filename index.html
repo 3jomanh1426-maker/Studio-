@@ -100,6 +100,11 @@
   .grp.empty .grp-h .ok{color:var(--muted)}
   .cloud{font-size:11px;color:var(--muted)} .cloud.ok{color:var(--ok)} .cloud.bad{color:var(--warn)}
   .field{font-family:inherit;font-size:14px;background:#100d0b;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:9px;width:100%}
+  .listen-intro{display:none}
+  body.listen .listen-intro{display:block}
+  body.listen main>section:not(#allTakes):not(.listen-intro){display:none}
+  body.listen .grp.empty{display:none}
+  body.listen #syncBadge,body.listen #onair{display:none}
   details summary{cursor:pointer;color:var(--muted);font-size:13px}
 </style>
 </head>
@@ -109,6 +114,13 @@
     <h1>🎙️ استديو التسجيل<small>رحلة ريال واحد — نموذج المدخلات والمخرجات</small></h1>
     <div id="onair" class="onair">ON AIR</div>
   </header>
+  <section class="panel share-bar" id="shareBar">
+    <div class="row" style="justify-content:space-between"><span class="muted">🔗 رابط الاستماع لمن تريدين مشاركته</span><button id="shareBtn" class="primary">نسخ رابط المشاركة</button></div>
+    <p class="muted" id="shareMsg" style="margin-top:6px"></p>
+  </section>
+  <section class="panel listen-intro" id="listenIntro">
+    <p style="margin:0">🎧 تسجيلات التعليق الصوتي لفيديو «رحلة ريال واحد». اضغطي ▶ للاستماع إلى أي مشهد.</p>
+  </section>
 
   <section class="panel">
     <div class="status"><span id="dot" class="dot"></span><span id="statusText">لم يُمنح إذن الميكروفون بعد</span></div>
@@ -473,12 +485,12 @@ function takeEl(rec,s){
   const el=document.createElement('div');el.className='take';
   const ms=rec.ms,over=ms&&ms/1000>s.max,blob=blobs[rec.id];
   const date=new Date(rec.created).toLocaleString('ar-SA',{day:'numeric',month:'short',hour:'numeric',minute:'2-digit'});
-  const cloud=!sync?'<span class="cloud">📱 على هذا الجهاز</span>':rec.synced?'<span class="cloud ok">☁️ على كل الأجهزة</span>':'<span class="cloud bad">⏳ لم يُرفع بعد</span>';
+  const cloud=rec.readonly?'<span class="cloud ok">🌐 منشور</span>':!sync?'<span class="cloud">📱 على هذا الجهاز</span>':rec.synced?'<span class="cloud ok">☁️ على كل الأجهزة</span>':'<span class="cloud bad">⏳ لم يُرفع بعد</span>';
   el.innerHTML=`<div class="take-head"><input class="take-name"><small class="${over?'over':''}">${ms?fmt(ms)+' / '+fmtS(s.max):''}${over?' ⚠️':''}</small></div><div class="row" style="justify-content:space-between"><small style="color:var(--muted)">${date}</small>${cloud}</div><audio controls preload="metadata" src="${urlFor(rec.id)}"></audio><div class="row take-actions"><button data-a="dl">⬇️ تنزيل</button><button data-a="del">🗑 حذف</button></div>`;
-  const nm=el.querySelector('.take-name');nm.value=rec.name;
+  const nm=el.querySelector('.take-name');nm.value=rec.name;if(rec.readonly){nm.readOnly=true;el.querySelector('[data-a=del]').remove()}
   nm.onchange=()=>{rec.name=nm.value.trim()||rec.scene;saveMeta(rec);if(sync&&rec.synced)queue(()=>indexEdit(ix=>{const e=ix.find(x=>x.id===rec.id);if(e)e.name=rec.name}))};
   const del=el.querySelector('[data-a=del]');
-  del.onclick=()=>{
+  if(del)del.onclick=()=>{
     if(!el._c){el._c=true;del.textContent='اضغطي مرة ثانية للتأكيد';setTimeout(()=>{el._c=false;del.textContent='🗑 حذف'},3000);return}
     removeLocal(rec.id);renderAll();if(sync&&rec.synced)queue(()=>removeRemote(rec));toast('حُذف التسجيل')};
   el.querySelector('[data-a=dl]').onclick=async()=>{const f=(nm.value||s.id).trim()+'.'+extFor(blob.type||rec.type);
@@ -490,8 +502,29 @@ function removeLocal(id){recs=recs.filter(r=>r.id!==id);if(urls[id]){URL.revokeO
 async function loadSaved(){
   try{const all=(await dbAll()).sort((a,b)=>a.created-b.created);all.forEach(r=>{blobs[r.id]=new Blob([r.buf],{type:r.type});delete r.buf;recs.push(r)});regroup();renderAll();
     if(navigator.storage?.persist)navigator.storage.persist().catch(()=>{})}catch(e){renderAll()}
-  if(sync)pull();
+  if(sync)pull();else pullPublic();
 }
+const PUBLIC_REPO='3jomanh1426-maker/studio-recordings';
+async function pullPublic(){
+  try{
+    const base='https://raw.githubusercontent.com/'+PUBLIC_REPO+'/HEAD/';
+    const r=await fetch(base+'index.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;
+    const list=await r.json();
+    for(const e of list){if(recs.find(x=>x.id===e.id))continue;
+      const a=await fetch(base+e.path);if(!a.ok)continue;
+      blobs[e.id]=new Blob([await a.arrayBuffer()],{type:e.type});
+      recs.push({id:e.id,scene:e.scene,name:e.name,ms:e.ms,type:e.type,created:e.created,synced:true,readonly:true});
+      regroup();renderAll();}
+  }catch(e){}
+}
+const LISTEN_URL=location.origin+location.pathname+'#listen';
+function applyMode(){document.body.classList.toggle('listen',location.hash==='#listen');if(window._ready&&typeof renderAll==='function')renderAll()}
+window.addEventListener('hashchange',applyMode);applyMode();
+$('shareBtn').onclick=async()=>{
+  $('shareMsg').innerHTML='الرابط: <span dir="ltr">'+LISTEN_URL+'</span><br>من يفتحه يرى التسجيلات ويسمعها فقط، بدون تعديل أو حذف. يحتاج أن يكون مستودع studio-recordings عامًا (Public).';
+  try{await navigator.clipboard.writeText(LISTEN_URL);toast('نُسخ رابط المشاركة ✓')}catch(e){}
+  if(navigator.share)navigator.share({title:'تسجيلات رحلة ريال واحد',url:LISTEN_URL}).catch(()=>{});
+};
 
 /* ===== المزامنة عبر GitHub ===== */
 let sync=null;try{sync=JSON.parse(localStorage.getItem('studio-sync')||'null')}catch(e){}
