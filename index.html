@@ -105,6 +105,11 @@
   body.listen main>section:not(#allTakes):not(.listen-intro){display:none}
   body.listen .grp.empty{display:none}
   body.listen #syncBadge,body.listen #onair{display:none}
+  .addbox{margin:8px 0;border:1px dashed var(--line);border-radius:10px;padding:8px 10px}
+  .pick{display:inline-block;background:var(--accent2);color:#1a120b;font-weight:700;padding:10px 14px;border-radius:10px;cursor:pointer;text-align:center}
+  .pick input{display:none}
+  .by{font-size:12px;color:var(--accent2)}
+  body.listen .addbox{display:none}
   details summary{cursor:pointer;color:var(--muted);font-size:13px}
 </style>
 </head>
@@ -161,6 +166,7 @@
     <div class="opts">
       <label><input type="checkbox" id="checkOn" checked> فحص القراءة أثناء التسجيل</label>
       <label><input type="checkbox" id="stopOnErr" checked> التوقّف عند الخطأ</label>
+      <label>اسمك <input id="myName" class="field" style="width:110px;padding:5px" placeholder="جمانه"></label>
       <label>حجم الخط <input type="range" id="fontSize" min="18" max="34" value="24"></label>
     </div>
     <details style="margin-top:10px"><summary>إعدادات الميكروفون</summary>
@@ -176,6 +182,14 @@
   <section class="panel" id="allTakes">
     <div class="row" style="justify-content:space-between"><h2 style="margin:0">📁 كل التسجيلات</h2><button id="syncBadge" class="badge" title="اضغطي للتحديث"></button></div>
     <div id="progress" class="progress"></div>
+    <details id="addBox" class="addbox"><summary>➕ إضافة تسجيل من ملف (مثل تسجيلات البنات)</summary>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
+        <label class="muted">المشهد<select id="addScene" class="field"></select></label>
+        <label class="muted">صاحبة الصوت<input id="addBy" class="field" placeholder="مثال: سارة"></label>
+        <label class="pick">📂 اختيار الملف<input id="addFile" type="file" accept="audio/*,.m4a,.mp3,.wav,.aac,.ogg,.opus,.webm,.mp4" multiple></label>
+        <p class="muted" style="margin:0">يُحفظ في الصفحة، ويُرفع للمزامنة ورابط المشاركة إذا كانت المزامنة مربوطة.</p>
+      </div>
+    </details>
     <div id="takes"><p class="muted">لا توجد تسجيلات بعد.</p></div>
   </section>
 
@@ -456,10 +470,10 @@ const dbAll=()=>dbDo('readonly',st=>st.getAll());
 async function saveLocal(rec){const blob=blobs[rec.id];const copy={...rec,buf:await blob.arrayBuffer()};await dbPut(copy)}
 async function saveMeta(rec){try{const all=await dbAll();const r=all.find(x=>x.id===rec.id);if(r){Object.assign(r,rec);await dbPut(r)}}catch(e){}}
 
-async function addTake(blob,ms,sceneId){
+async function addTake(blob,ms,sceneId,by){
   const s=sceneId?SCENES.find(x=>x.id===sceneId):cur;
   const n=(takes[s.id]?.length||0)+1;
-  const rec={id:Date.now()+'-'+Math.random().toString(36).slice(2,7),scene:s.id,name:s.id+(n>1?'_'+n:''),ms,type:blob.type||'audio/mp4',created:Date.now(),synced:false};
+  const rec={id:Date.now()+'-'+Math.random().toString(36).slice(2,8),scene:s.id,name:s.id+(n>1?'_'+n:''),ms,type:blob.type||'audio/mp4',created:Date.now(),synced:false,by:(by!==undefined?by:(localStorage.getItem('studio-me')||'')).trim()};
   blobs[rec.id]=blob;recs.push(rec);regroup();renderAll();
   toast('✅ تم تسجيل المشهد '+s.id);
   try{await saveLocal(rec)}catch(e){toast('تعذّر الحفظ في الصفحة — نزّلي التسجيل')}
@@ -486,7 +500,7 @@ function takeEl(rec,s){
   const ms=rec.ms,over=ms&&ms/1000>s.max,blob=blobs[rec.id];
   const date=new Date(rec.created).toLocaleString('ar-SA',{day:'numeric',month:'short',hour:'numeric',minute:'2-digit'});
   const cloud=rec.readonly?'<span class="cloud ok">🌐 منشور</span>':!sync?'<span class="cloud">📱 على هذا الجهاز</span>':rec.synced?'<span class="cloud ok">☁️ على كل الأجهزة</span>':'<span class="cloud bad">⏳ لم يُرفع بعد</span>';
-  el.innerHTML=`<div class="take-head"><input class="take-name"><small class="${over?'over':''}">${ms?fmt(ms)+' / '+fmtS(s.max):''}${over?' ⚠️':''}</small></div><div class="row" style="justify-content:space-between"><small style="color:var(--muted)">${date}</small>${cloud}</div><audio controls preload="metadata" src="${urlFor(rec.id)}"></audio><div class="row take-actions"><button data-a="dl">⬇️ تنزيل</button><button data-a="del">🗑 حذف</button></div>`;
+  el.innerHTML=`<div class="take-head"><input class="take-name"><small class="${over?'over':''}">${ms?fmt(ms)+' / '+fmtS(s.max):''}${over?' ⚠️':''}</small></div><div class="row" style="justify-content:space-between"><small style="color:var(--muted)">${rec.by?'<span class="by">🎙️ بصوت: '+rec.by.replace(/</g,'&lt;')+'</span> · ':''}${date}</small>${cloud}</div><audio controls preload="metadata" src="${urlFor(rec.id)}"></audio><div class="row take-actions"><button data-a="dl">⬇️ تنزيل</button><button data-a="del">🗑 حذف</button></div>`;
   const nm=el.querySelector('.take-name');nm.value=rec.name;if(rec.readonly){nm.readOnly=true;el.querySelector('[data-a=del]').remove()}
   nm.onchange=()=>{rec.name=nm.value.trim()||rec.scene;saveMeta(rec);if(sync&&rec.synced)queue(()=>indexEdit(ix=>{const e=ix.find(x=>x.id===rec.id);if(e)e.name=rec.name}))};
   const del=el.querySelector('[data-a=del]');
@@ -513,10 +527,21 @@ async function pullPublic(){
     for(const e of list){if(recs.find(x=>x.id===e.id))continue;
       const a=await fetch(base+e.path);if(!a.ok)continue;
       blobs[e.id]=new Blob([await a.arrayBuffer()],{type:e.type});
-      recs.push({id:e.id,scene:e.scene,name:e.name,ms:e.ms,type:e.type,created:e.created,synced:true,readonly:true});
+      recs.push({id:e.id,scene:e.scene,name:e.name,ms:e.ms,type:e.type,created:e.created,by:e.by||'',synced:true,readonly:true});
       regroup();renderAll();}
   }catch(e){}
 }
+function fillAddScene(){const sel=$('addScene');sel.innerHTML='';SCENES.forEach(x=>{const o=document.createElement('option');o.value=x.id;o.textContent=(x.core?'★ ':'')+x.id+' — '+x.name;if(x===cur)o.selected=true;sel.appendChild(o)})}
+fillAddScene();
+$('addBox').addEventListener('toggle',()=>{if($('addBox').open)$('addScene').value=cur.id});
+try{$('myName').value=localStorage.getItem('studio-me')||'';$('addBy').value=localStorage.getItem('studio-lastby')||''}catch(e){}
+$('myName').onchange=()=>{try{localStorage.setItem('studio-me',$('myName').value.trim())}catch(e){}};
+$('addFile').onchange=async e=>{
+  const files=[...e.target.files];e.target.value='';if(!files.length)return;
+  const by=$('addBy').value.trim(),sc=$('addScene').value;try{localStorage.setItem('studio-lastby',by)}catch(x){}
+  for(const f of files){const ms=await new Promise(res=>{const a=new Audio(URL.createObjectURL(f));a.onloadedmetadata=()=>res(isFinite(a.duration)?a.duration*1000:0);a.onerror=()=>res(0);setTimeout(()=>res(0),4000)});await addTake(f,ms,sc,by)}
+  toast('أُضيف '+files.length+' تسجيل للمشهد '+sc+(by?' بصوت '+by:''));
+};
 const LISTEN_URL=location.origin+location.pathname+'#listen';
 function applyMode(){document.body.classList.toggle('listen',location.hash==='#listen');if(window._ready&&typeof renderAll==='function')renderAll()}
 window.addEventListener('hashchange',applyMode);applyMode();
@@ -548,7 +573,7 @@ async function upload(rec){
   const path='recordings/'+rec.id+'.'+extFor(rec.type);
   const exists=await gh('/contents/'+path);
   if(!exists)await gh('/contents/'+path,{method:'PUT',body:{message:'تسجيل المشهد '+rec.scene,content:b64(await blobs[rec.id].arrayBuffer())}});
-  await indexEdit(list=>{if(!list.find(x=>x.id===rec.id))list.push({id:rec.id,scene:rec.scene,name:rec.name,ms:rec.ms,type:rec.type,created:rec.created,path})});
+  await indexEdit(list=>{if(!list.find(x=>x.id===rec.id))list.push({id:rec.id,scene:rec.scene,name:rec.name,ms:rec.ms,type:rec.type,created:rec.created,by:rec.by||'',path})});
   rec.synced=true;await saveMeta(rec);renderAll();setSync('ok');
 }
 async function removeRemote(rec){
@@ -565,7 +590,7 @@ function pull(){return queue(async()=>{
     const loc=recs.find(r=>r.id===e.id);
     if(loc){if(loc.name!==e.name){loc.name=e.name;saveMeta(loc)}continue}
     const r=await gh('/contents/'+e.path,{raw:true});if(!r)continue;
-    const rec={id:e.id,scene:e.scene,name:e.name,ms:e.ms,type:e.type,created:e.created,synced:true};
+    const rec={id:e.id,scene:e.scene,name:e.name,ms:e.ms,type:e.type,created:e.created,by:e.by||'',synced:true};
     blobs[rec.id]=new Blob([await r.arrayBuffer()],{type:e.type});recs.push(rec);try{await saveLocal(rec)}catch(x){}
   }
   regroup();renderAll();
