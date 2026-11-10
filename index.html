@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>استديو التسجيل — رحلة ريال واحد</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;700&family=Noto+Naskh+Arabic:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  :root{--bg:#14110f;--panel:#1e1a17;--line:#2e2824;--text:#f3ece4;--muted:#a39889;--accent:#e2483d;--accent2:#f0a35e;--ok:#7fbf7f;--warn:#f0c75e}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:"IBM Plex Sans Arabic",system-ui,sans-serif;display:flex;justify-content:center;padding:16px 12px 60px}
+  main{width:100%;max-width:720px;display:flex;flex-direction:column;gap:14px}
+  header{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  h1{font-size:20px;margin:0}
+  h1 small{display:block;font-size:12px;color:var(--muted);font-weight:400}
+  .onair{font-size:12px;font-weight:700;padding:5px 10px;border-radius:6px;border:1px solid var(--line);color:var(--muted);transition:.2s;direction:ltr}
+  .onair.live{background:var(--accent);border-color:var(--accent);color:#fff;box-shadow:0 0 18px rgba(226,72,61,.55)}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px}
+  .muted{color:var(--muted);font-size:13px;line-height:1.7;margin:0}
+  .status{display:flex;align-items:center;gap:8px;font-size:14px;margin-bottom:6px}
+  .dot{width:9px;height:9px;border-radius:50%;background:var(--muted);flex:none}
+  .dot.ok{background:var(--ok)}.dot.bad{background:var(--accent)}
+  button{font-family:inherit;font-size:14px;border:0;border-radius:10px;padding:10px 14px;cursor:pointer;background:#2b2521;color:var(--text)}
+  button:active{transform:scale(.97)} button:disabled{opacity:.4;cursor:not-allowed}
+  .primary{background:var(--accent2);color:#1a120b;font-weight:700}
+  .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  /* scenes */
+  .scenes{display:flex;flex-wrap:wrap;gap:6px}
+  .chip{padding:7px 11px;border-radius:999px;background:#2b2521;font-size:13px;position:relative;border:1px solid transparent}
+  .chip.opt{opacity:.75}
+  .chip.sel{background:var(--accent2);color:#1a120b;font-weight:700}
+  .chip.done::after{content:"✓";position:absolute;top:-6px;left:-4px;background:var(--ok);color:#10200f;border-radius:50%;width:16px;height:16px;font-size:11px;display:grid;place-items:center}
+  .scene-title{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin:12px 0 4px}
+  .scene-title b{font-size:16px}
+  .scene-title span{font-size:12px;color:var(--muted);white-space:nowrap}
+  /* prompter */
+  .prompter{font-family:"Noto Naskh Arabic",serif;line-height:2.1;max-height:46vh;overflow-y:auto;padding:6px 4px;scroll-behavior:smooth}
+  .seg{padding:4px 8px;border-radius:8px;margin:2px 0;transition:background .3s,opacity .3s}
+  .seg .t{font-family:"IBM Plex Sans Arabic";font-size:11px;color:var(--muted);background:#100d0b;border-radius:5px;padding:1px 6px;margin-left:6px;direction:ltr;display:inline-block;vertical-align:middle}
+  .rec-mode .seg{opacity:.45}
+  .rec-mode .seg.now{opacity:1;background:#2a221c}
+  .w{border-radius:4px;transition:color .2s,background .2s}
+  .w.ok{color:var(--ok)}
+  .w.cur{background:#3a2f26}
+  .w.err{color:#fff;background:var(--accent)}
+  .w.skip{color:var(--accent);text-decoration:line-through}
+  .tip{border-bottom:2px dotted var(--warn);cursor:help}
+  /* recorder */
+  canvas{width:100%;height:70px;display:block;border-radius:10px;background:#100d0b}
+  .meter{height:6px;border-radius:3px;background:#100d0b;overflow:hidden;margin-top:8px}
+  .meter i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--ok),var(--accent2) 70%,var(--accent))}
+  .timebar{display:flex;justify-content:center;align-items:baseline;gap:8px;margin-top:10px;direction:ltr;font-variant-numeric:tabular-nums}
+  .timer{font-size:30px;font-weight:500}
+  .timer.near{color:var(--warn)} .timer.over{color:var(--accent)}
+  .max{color:var(--muted);font-size:15px}
+  .controls{display:flex;align-items:center;justify-content:center;gap:16px;margin-top:10px}
+  .rec{width:70px;height:70px;border-radius:50%;padding:0;display:grid;place-items:center;border:3px solid #3a322c}
+  .rec span{width:28px;height:28px;border-radius:50%;background:var(--accent);transition:.2s}
+  .rec.on span{border-radius:6px;width:24px;height:24px}
+  .round{width:48px;height:48px;border-radius:50%;padding:0;font-size:17px}
+  .opts{display:flex;flex-wrap:wrap;gap:12px;margin-top:12px;font-size:13px;color:var(--muted);align-items:center}
+  .opts label{display:flex;gap:6px;align-items:center;cursor:pointer}
+  select{font-family:inherit;background:#100d0b;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:6px;max-width:100%}
+  .heard{font-size:13px;color:var(--muted);min-height:20px;margin-top:8px}
+  /* correction card */
+  .fix{display:none;border:1px solid var(--accent);background:#2a1513;border-radius:12px;padding:12px;margin-top:10px}
+  .fix.show{display:block}
+  .fix h3{margin:0 0 6px;font-size:15px}
+  .fix .right{font-family:"Noto Naskh Arabic",serif;font-size:22px;color:var(--ok)}
+  .fix .wrong{color:#ff9a90;text-decoration:line-through}
+  .tipbox{display:none;margin-top:8px;background:#2a2516;border:1px solid #5a4b22;border-radius:10px;padding:10px;font-size:14px}
+  .tipbox.show{display:block}
+  h2{font-size:15px;margin:0 0 8px}
+  .take{border-top:1px solid var(--line);padding:10px 0;display:flex;flex-direction:column;gap:6px}
+  .take:first-child{border-top:0}
+  .take-head{display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .take-name{background:transparent;border:0;color:var(--text);font:inherit;font-weight:500;width:100%;direction:ltr;text-align:right}
+  .take small{color:var(--muted);white-space:nowrap;direction:ltr}
+  .take small.over{color:var(--accent)}
+  .take audio{width:100%;height:36px}
+  .take-actions button{font-size:12px;padding:6px 10px}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  td,th{border-bottom:1px solid var(--line);padding:6px 4px;text-align:right}
+  td.l{direction:ltr;text-align:right}
+  .fallback{display:none;margin-top:8px}.fallback.show{display:block}
+  .fallback label{display:inline-block;background:#2b2521;padding:9px 13px;border-radius:10px;cursor:pointer;font-size:14px}
+  .fallback input{display:none}
+  .toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#2b2521;border:1px solid var(--line);padding:10px 16px;border-radius:10px;font-size:14px;opacity:0;transition:.25s;pointer-events:none;z-index:9;max-width:90vw}
+  .toast.show{opacity:1}
+  details summary{cursor:pointer;color:var(--muted);font-size:13px}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>🎙️ استديو التسجيل<small>رحلة ريال واحد — نموذج المدخلات والمخرجات</small></h1>
+    <div id="onair" class="onair">ON AIR</div>
+  </header>
+
+  <section class="panel">
+    <div class="status"><span id="dot" class="dot"></span><span id="statusText">لم يُمنح إذن الميكروفون بعد</span></div>
+    <p class="muted" id="permHint">اضغطي الزر، وعندما يسألك المتصفح اختاري «السماح».</p>
+    <div class="row" style="margin-top:8px"><button id="allowBtn" class="primary">السماح بالوصول إلى الميكروفون</button></div>
+    <div id="fallback" class="fallback">
+      <p class="muted" style="margin-bottom:6px">الميكروفون لا يعمل داخل تطبيق Claude. سجّلي المشهد في تطبيق «المذكرات الصوتية»، ثم اختاري «حفظ في الملفات»، وارجعي هنا وأضيفي الملف، وسيُسمّى باسم المشهد المختار:</p>
+      <label>📂 إضافة تسجيل من الجهاز<input id="fileIn" type="file" accept="audio/*,.m4a,.mp3,.wav,.aac"></label>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="scenes" id="scenes"></div>
+    <div class="scene-title"><b id="sceneName"></b><span id="sceneMeta"></span></div>
+    <div id="prompter" class="prompter"></div>
+    <div id="tipbox" class="tipbox"></div>
+  </section>
+
+  <section class="panel">
+    <canvas id="wave" width="1200" height="140"></canvas>
+    <div class="meter"><i id="level"></i></div>
+    <div class="timebar"><span class="timer" id="timer">00:00.0</span><span class="max" id="maxLbl"></span></div>
+    <div class="controls">
+      <button id="practiceBtn" class="round" title="تدريب: فحص القراءة بدون تسجيل">📖</button>
+      <button id="recBtn" class="rec" disabled title="تسجيل"><span></span></button>
+      <button id="pauseBtn" class="round" disabled title="إيقاف مؤقت">⏸</button>
+    </div>
+    <div class="heard" id="heard"></div>
+    <div id="fix" class="fix">
+      <h3 id="fixTitle">توقّفي — هنا خطأ</h3>
+      <div id="fixBody"></div>
+      <div class="row" style="margin-top:10px">
+        <button id="fixContinue" class="primary">متابعة</button>
+        <button id="fixRedo">إعادة المشهد من البداية</button>
+      </div>
+    </div>
+    <div class="opts">
+      <label><input type="checkbox" id="checkOn" checked> فحص القراءة أثناء التسجيل</label>
+      <label><input type="checkbox" id="stopOnErr" checked> التوقّف عند الخطأ</label>
+      <label>حجم الخط <input type="range" id="fontSize" min="18" max="34" value="24"></label>
+    </div>
+    <details style="margin-top:10px"><summary>إعدادات الميكروفون</summary>
+      <div class="opts">
+        <select id="deviceSel" disabled><option value="">الميكروفون الافتراضي</option></select>
+        <label><input type="checkbox" id="noise" checked> تقليل الضوضاء</label>
+        <label><input type="checkbox" id="echo" checked> إلغاء الصدى</label>
+      </div>
+    </details>
+    <p class="muted" id="checkNote" style="margin-top:8px"></p>
+  </section>
+
+  <section class="panel">
+    <h2>التسجيلات</h2>
+    <div id="takes"><p class="muted">لا توجد تسجيلات بعد.</p></div>
+  </section>
+
+  <section class="panel">
+    <h2>جدول المدد</h2>
+    <table id="plan"></table>
+    <div class="row" style="margin-top:8px"><button id="copyPlan">نسخ الجدول</button></div>
+    <p class="muted" style="margin-top:6px">التسجيلات تبقى في هذه الصفحة فقط، فنزّليها قبل إغلاقها.</p>
+  </section>
+</main>
+<div id="toast" class="toast"></div>
+
+<script>
+/* ===== السيناريو ===== {كلمة|ملاحظة} = كلمة عليها تنبيه نطق */
+const SCENES=[
+ {id:'07',name:'الميزان: التوازن',max:38,core:true,segs:[
+  [2,'على {الكِفّة|بكسر الكاف: كِفّة الميزان} اليمنى نضع ما يبيعه القطاع: الطلب الوسيط ثم الطلب النهائي،'],
+  [9,'وهذا هو إجمالي الصف.'],
+  [13,'وعلى {الكِفّة|بكسر الكاف: كِفّة الميزان} اليسرى ما استخدمه: {المستلزَمات|بفتح الزاي: المُستلزَمات} الوسيطة ثم القيمة المضافة،'],
+  [19,'وهذا هو إجمالي العمود.'],
+  [23,'وقاعدة التوازن: إجمالي الصف يساوي إجمالي العمود.'],
+  [32,'وعلى مستوى الاقتصاد كله، مجموع القيمة المضافة يساوي مجموع الطلب النهائي.']]},
+ {id:'08',name:'من داخل المخبز: معامل التقنية ومعكوس ليونتيف',max:48,core:true,segs:[
+  [2,'لندخل المخبز الذي اشترينا منه الرغيف. ما يحتاجه القطاع لينتج وحدة واحدة {يُسمّى|بضم الياء: يُسمّى} {مُعامِل|بكسر الميم الثانية: مُعامِل (معامل رياضي)، لا «مُعامَلة»} التقنية.'],
+  [7,'مثلًا: {خُمس|بضم الخاء: خُمْس} وحدة دقيق من المزرعة، {وعُشر|بضم العين: عُشْر} وحدة طاقة من المصنع، وثلاثة أعشار من النقل،'],
+  [15,'لنحصل على رغيف واحد، بالوصفة نفسها كل مرة.'],
+  [18,'بهذه الوصفات نكتب الاقتصاد كله: الإنتاج يساوي ما تحتاجه القطاعات زائد الطلب النهائي.'],
+  [25,'ننقل الحدّ إلى الطرف الآخر،'],
+  [31,'ثم نضرب في المعكوس فنصل إلى الحل: إكس تساوي معكوس آي ناقص إيه، {مضروبًا|بالتنوين والفتح: مضروبًا (حال)} في إف.'],
+  [38,'وهذا معكوس {ليونتيف|لِيُونْتِيف}، يحسب كل ما يلزم مباشرة وبشكل غير مباشر لتلبية الطلب النهائي.']]},
+ {id:'09',name:'من داخل المصنع: المضاعفات',max:38,core:true,segs:[
+  [2,'وصلت إلى المصنع طلبات جديدة من المستهلكين.'],
+  [6,'الأثر المباشر: خط الإنتاج {يُسرِع|بضم الياء وكسر الراء: يُسرِع}.'],
+  [12,'لكن المصنع يحتاج مدخلات أكثر، فيشتري من الزراعة والخدمات، وهذا هو الأثر غير المباشر.'],
+  [19,'وهذه القطاعات بدورها تشتري أكثر، فتتساقط القطع كالدومينو.'],
+  [25,'المباشر وغير المباشر معًا هما الأثر الكلي، وتقيسه المضاعفات: كم يزيد الإنتاج الكلي إذا زاد الطلب على قطاع واحد.']]},
+ {id:'10',name:'خريطة المترو: الارتباطات',max:38,core:true,segs:[
+  [2,'تخيّلوا الاقتصاد خريطة مترو، والصناعة محطة رئيسية.'],
+  [5,'القطارات القادمة إليها تحمل المدخلات، وهذا هو الارتباط الخلفي: اعتماد القطاع على من {يُزوِّده|بضم الياء وكسر الواو المشدّدة}، ونحسبه بجمع عمود {مُعامِلاته|بكسر الميم الثانية: مُعامِلات فنية (معاملات رياضية)، لا «مُعامَلات»} الفنية.'],
+  [21,'والقطارات المنطلقة منها تحمل منتجاتها إلى الآخرين، وهذا هو الارتباط الأمامي، ونحسبه بجمع الصف.'],
+  [33,'فالخلفي ما يشتريه القطاع، والأمامي ما يبيعه.']]},
+ {id:'13',name:'في السوق: الأسعار والتكاليف',max:38,core:true,segs:[
+  [2,'على رف السوق، سعر أي منتج يتكوّن من {جزأين|تُنطق: جُزْءَيْن}: تكلفة المدخلات الوسيطة التي دخلت في إنتاجه،'],
+  [10,'والقيمة المضافة من أجور وأرباح وضرائب.'],
+  [14,'وهذا هو النظام السعري في النموذج.'],
+  [24,'فلو ارتفعت الأجور في المزرعة، ارتفع سعر القمح،'],
+  [28,'فارتفعت تكلفة الخبز والتوصيل، وتحرّكت كل الأسعار.'],
+  [33,'وهكذا نقيس أثر أي تغيّر في التكاليف على الأسعار النهائية.']]},
+ {id:'14',name:'ورشة الترميم: طريقة RAS',max:43,core:true,segs:[
+  [2,'إعداد جدول جديد {مُكلِف|بكسر اللام: مُكلِف} ويستغرق وقتًا، فنرمّم الجدول القديم بطريقة آر إيه إس.'],
+  [8,'إيه واحد تساوي آر، {مضروبةً|بالتنوين والفتح: مضروبةً (حال)} في إيه صفر، {مضروبةً|بالتنوين والفتح: مضروبةً (حال)} في إس.'],
+  [11,'آر مضاعفات {الإحلال|بكسر الهمزة: الإِحلال} للصفوف،'],
+  [14,'وإس مضاعفات التصنيع للأعمدة.'],
+  [18,'ونحتاج {مُعامِلات|بكسر الميم الثانية: مُعامِلات (معاملات رياضية)} سنة الأساس، وإنتاج السنة الحالية، ومجاميع الصفوف والأعمدة الجديدة.'],
+  [27,'ثم نعدّل الصفوف، ثم الأعمدة، ونكرّر،'],
+  [35,'حتى نصل إلى نقطة التقارب، وتعود للجدول ألوانه.']]},
+ {id:'15',name:'طيران فوق المملكة: الجدول والناتج المحلي',max:48,core:true,segs:[
+  [2,'ومن السماء نرى المملكة: جدول المدخلات والمخرجات لعام ألفين وعشرة يربط {ثمانيةَ|مبنيّ على فتح الجزأين: ثمانيةَ عشرَ قطاعًا} {عشرَ|مبنيّ على فتح الجزأين: ثمانيةَ عشرَ قطاعًا} قطاعًا تغطي كل النشاطات.'],
+  [14,'ومنه نحسب الناتج المحلي بثلاث طرق: منهج الإنتاج، إجمالي الناتج ناقص الاستهلاك الوسيط زائد صافي الضرائب.'],
+  [23,'ومنهج الدخل، تعويضات العاملين وفائض التشغيل واستهلاك رأس المال وصافي الضرائب.'],
+  [33,'ومنهج الإنفاق، الطلب النهائي ناقص الواردات.'],
+  [41,'والطرق الثلاث تعطي النتيجة نفسها، متطابقة مع الحسابات القومية.']]},
+ {id:'02',name:'رحلة حبة القمح',max:38,core:false,segs:[
+  [0,'لنتبع رحلة هذا الريال من البداية.'],
+  [5,'في المزرعة، تبيع الزراعة قمحها للمصنع.'],
+  [9,'والمصنع يبيع معداته لقطاع الخدمات.'],
+  [12,'والخدمات تعود فتنقل منتجات المزرعة وتموّلها.'],
+  [16,'إذن كل قطاع {بائعٌ|بالتنوين: بائعٌ} {ومشترٍ|تُنطق: ومُشْتَرٍ بالتنوين، لا «ومشتري»} في الوقت نفسه.'],
+  [20,'وما يتبقى يصل إلى المستهلكين، وهذا هو الطلب النهائي.'],
+  [27,'وجدول المدخلات والمخرجات يسجّل كل هذه التدفقات في جدول واحد خلال سنة: كل صف يبيّن ما يبيعه القطاع، وكل عمود يبيّن ما يشتريه.']]},
+ {id:'05',name:'غرفة عمليات التخطيط: الاستخدامات',max:44,core:false,segs:[
+  [1,'في غرفة عمليات التخطيط، {يُستخدَم|مبني للمجهول: يُستخدَم} الجدول أولًا لدراسة {التشابُك|بضم الباء: التشابُك} بين القطاعات وتطوّره.'],
+  [12,'وثانيًا لتحديد مستوى الإنتاج اللازم في كل قطاع، ليغطي الطلب الوسيط بين القطاعات، والطلب النهائي من استهلاك واستثمار وصادرات.'],
+  [24,'وثالثًا لقياس أثر أي تغيّر، مثل زيادة الطلب، أو تغيّر التجارة،'],
+  [30,'أو دخول مشروع جديد إلى الاقتصاد، بآثاره المباشرة وغير المباشرة.'],
+  [37,'كما {يُستخدَم|مبني للمجهول: يُستخدَم} في دراسة هيكل الإنتاج والتجارة الخارجية والقيمة المضافة والأسعار والتقنية.']]},
+ {id:'16',name:'العودة إلى النشرة: الخاتمة',max:33,core:false,segs:[
+  [4,'في ختام الحلقة: نموذج المدخلات والمخرجات {يُحدِّد|بضم الياء وكسر الدال المشدّدة} الاحتياجات المباشرة وغير المباشرة،'],
+  [11,'ويدرس أثر التغيّر في الطلب والتكاليف والأسعار،'],
+  [17,'ويتكامل مع الحسابات القومية،'],
+  [24,'ويدعم التخطيط والتنمية المستدامة في المملكة.'],
+  [27,'وهكذا عاد الريال إلى المستهلك... لتبدأ رحلة جديدة.']]}
+];
+
+/* ===== أدوات ===== */
+const $=id=>document.getElementById(id);
+const fmt=ms=>{const s=Math.max(0,ms)/1000,m=Math.floor(s/60);return String(m).padStart(2,'0')+':'+(s%60).toFixed(1).padStart(4,'0')};
+const fmtS=s=>Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0');
+function toast(m){const t=$('toast');t.textContent=m;t.classList.add('show');clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove('show'),2800)}
+function setStatus(c,t){$('dot').className='dot '+(c||'');$('statusText').textContent=t}
+function norm(w){return (w||'').toLowerCase().replace(/[ً-ٰٟـ]/g,'').replace(/[أإآٱ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه').replace(/ؤ/g,'و').replace(/ئ/g,'ي').replace(/[^ء-يa-z0-9]/g,'')}
+const STOP=new Set(['و','في','من','ثم','او','على','الى','ما','هو','هذا','هذه','كل','مع','عن','ان','لا','فـ','ب','ل']);
+const NUMW=new Set(['واحد','واحده','صفر','ثمانيه','عشر','عشره','الفين','وعشره','ثلاثه','خمس','خمسين','ثمانيه','اثنين']);
+const LETTERS=new Set(['اكس','اي','ايه','اف','ار','اس','راس']);
+function lev(a,b){const m=a.length,n=b.length;if(!m)return n;if(!n)return m;let p=Array.from({length:n+1},(_,i)=>i);for(let i=1;i<=m;i++){let c=[i];for(let j=1;j<=n;j++)c[j]=Math.min(p[j]+1,c[j-1]+1,p[j-1]+(a[i-1]===b[j-1]?0:1));p=c}return p[n]}
+function strip(w){return w.replace(/^(وال|فال|بال|كال|لل|ال|و|ف)/,'')}
+function similar(a,b){if(a===b)return true;const A=strip(a),B=strip(b);if(A===B&&A.length>=2)return true;const L=Math.max(A.length,B.length);if(L<4)return false;return 1-lev(A,B)/L>=0.72}
+
+/* ===== بناء الملقّن ===== */
+let cur=SCENES[0], tokens=[], takes={}, takeCount={};
+function renderChips(){
+  $('scenes').innerHTML='';
+  SCENES.forEach(s=>{const b=document.createElement('button');b.className='chip'+(s.core?'':' opt')+(s===cur?' sel':'')+(takes[s.id]?.length?' done':'');
+    b.textContent=(s.core?'★ ':'')+s.id;b.title=s.name+(s.core?'':' (اختياري)');b.onclick=()=>{if(isBusy()){toast('أوقفي التسجيل أولًا');return}cur=s;renderScene()};$('scenes').appendChild(b)});
+}
+function renderScene(){
+  renderChips();
+  $('sceneName').textContent='المشهد '+cur.id+' — '+cur.name;
+  $('sceneMeta').textContent=(cur.core?'أساسي':'اختياري')+' · أقصى مدة '+cur.max+' ث';
+  $('maxLbl').textContent='/ '+fmtS(cur.max);
+  const p=$('prompter');p.innerHTML='';tokens=[];
+  cur.segs.forEach(([t,txt],si)=>{
+    const seg=document.createElement('div');seg.className='seg';seg.dataset.t=t;
+    seg.innerHTML='<span class="t">'+fmtS(t)+'</span>';
+    const tips=[];txt=txt.replace(/\{([^|}]+)\|([^}]+)\}/g,(m,w,n)=>{tips.push([w,n]);return '§'+(tips.length-1)+'§'});
+    txt.split(/\s+/).filter(Boolean).forEach(raw=>{
+      let tip=null;const disp=raw.replace(/§(\d+)§/,(m,k)=>{tip=tips[+k][1];return tips[+k][0]});
+      const sp=document.createElement('span');sp.className='w'+(tip?' tip':'');sp.textContent=disp;
+      if(tip){sp.onclick=()=>showTip(disp,tip)}
+      const n=norm(disp);
+      if(n){sp.dataset.i=tokens.length;tokens.push({disp,n,tip,el:sp,seg:si})}
+      seg.appendChild(sp);seg.appendChild(document.createTextNode(' '));
+    });
+    p.appendChild(seg);
+  });
+  $('tipbox').classList.remove('show');resetChecker();$('timer').textContent='00:00.0';$('timer').className='timer';
+}
+function showTip(w,n){const b=$('tipbox');b.innerHTML='🔤 <b style="font-family:Noto Naskh Arabic;font-size:18px">'+w+'</b> — '+n;b.classList.add('show')}
+$('fontSize').oninput=e=>$('prompter').style.fontSize=e.target.value+'px';$('prompter').style.fontSize='24px';
+
+/* ===== فاحص القراءة ===== */
+let ptr=0, pending=[], errors=[];
+function resetChecker(){ptr=0;pending=[];errors=[];tokens.forEach(t=>t.el.className='w'+(t.tip?' tip':''));markCur();$('heard').textContent='';hideFix()}
+function markCur(){tokens.forEach(t=>t.el.classList.remove('cur'));if(tokens[ptr]){tokens[ptr].el.classList.add('cur');const p=$('prompter'),el=tokens[ptr].el;if(el.offsetTop-p.scrollTop>p.clientHeight*0.6||el.offsetTop<p.scrollTop)p.scrollTop=el.offsetTop-p.clientHeight*0.3}}
+function isContent(t){return t.n.length>=3&&!STOP.has(t.n)}
+function findAhead(w,from,span){for(let k=0;k<=span;k++){const t=tokens[from+k];if(!t)break;if(similar(w,t.n))return k}return -1}
+function feed(text){
+  const words=text.split(/\s+/).map(norm).filter(Boolean);
+  for(const w of words){
+    if(ptr>=tokens.length)break;
+    const inSet=(S,n)=>S.has(n)||S.has(strip(n));
+    if(/[0-9]/.test(w)){let k=0;while(tokens[ptr+k]&&inSet(NUMW,tokens[ptr+k].n)){good(ptr+k);k++}ptr+=k;pending=[];continue}
+    if(/^[a-z]+$/.test(w)){if(inSet(LETTERS,tokens[ptr].n)){good(ptr);ptr++}continue}
+    const k=findAhead(w,ptr,5);
+    if(k>=0){
+      for(let i=ptr;i<ptr+k&&!fixOpen;i++){
+        const t=tokens[i];
+        if(!isContent(t)){good(i);continue}
+        if(i===ptr&&pending.length)raise('wrong',t,pending.join(' ')); // كلمة قيلت بدل كلمة النص
+        else raise('skip',t);
+      }
+      if(fixOpen){ptr=lastErrIdx;pending=[];markCur();break}
+      good(ptr+k);ptr+=k+1;pending=[];
+    }else{
+      pending.push(w);
+      if(pending.length>=3){raise('lost',tokens[ptr],pending.join(' '));pending=[]}
+    }
+    markCur();
+    if(fixOpen)break;
+  }
+}
+function good(i){const c=tokens[i].el.classList;c.remove('err','skip');c.add('ok')}
+let fixOpen=false,lastErrIdx=0;
+function raise(type,t0,said){const t={...t0,disp:t0.disp.replace(/[،.:,؛…]+/g,'')};t.el=t0.el;
+  lastErrIdx=tokens.indexOf(t0);
+  if(type==='skip')t.el.classList.add('skip');else t.el.classList.add('err');
+  errors.push({type,word:t.disp,said});
+  const tipHtml=t.tip?'<p class="muted">🔤 '+t.tip+'</p>':'';
+  let body='';
+  if(type==='skip')body='<p>نسيتِ كلمة: <span class="right">'+t.disp+'</span></p>';
+  else if(type==='wrong')body='<p>سمعتُ: <span class="wrong">'+said+'</span></p><p>والصحيح: <span class="right">'+t.disp+'</span></p>';
+  else body='<p>يبدو أنكِ خرجتِ عن النص. أكملي من: <span class="right">'+t.disp+'</span></p>';
+  $('fixBody').innerHTML=body+tipHtml;
+  $('fixTitle').textContent=type==='skip'?'توقّفي — كلمة ناقصة':type==='wrong'?'توقّفي — كلمة مختلفة':'توقّفي — خروج عن النص';
+  if(type==='skip'){/* الكلمة الناقصة تُعرض دون إيقاف إن كان الإيقاف مطفأً */}
+  if($('stopOnErr').checked){$('fix').classList.add('show');fixOpen=true;pauseForFix()}
+  else toast(type==='skip'?'كلمة ناقصة: '+t.disp:'تنبيه عند: '+t.disp);
+}
+function hideFix(){$('fix').classList.remove('show');fixOpen=false}
+
+/* ===== محركات تحويل الكلام إلى نص ===== */
+let dict=null, sr=null, listening=false, wantListen=false;
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+(async()=>{try{if(window.claude&&claude.use){dict=await claude.use('dictation');if(dict){dict.onFinal(e=>{if(!fixOpen)feed(e.text)});dict.onPartial(e=>{$('heard').textContent=e.text?'🗣️ '+e.text:''});dict.onState(e=>{listening=e.state!=='idle';if(e.state==='idle'&&e.reason&&!['stopped','viewer_stopped'].includes(e.reason)&&e.reason!=='hidden')toast('توقّف الفحص: '+e.reason)})}}}catch(e){}updateCheckNote()})();
+function updateCheckNote(){
+  $('checkNote').textContent=(dict||SR)?'فحص القراءة يقارن كلامك بالنص كلمةً كلمة: يكتشف الكلمات الناقصة أو المختلفة. الحركات لا يكشفها، لذلك عليها خط أصفر منقّط، اضغطي عليها لتري طريقة النطق.':'فحص القراءة غير متاح في هذا المتصفح (يعمل في Chrome). الكلمات ذات الخط الأصفر عليها تنبيه نطق، اضغطي عليها.';
+  if(!dict&&!SR){$('checkOn').checked=false;$('checkOn').disabled=true;$('practiceBtn').disabled=true}
+}
+function startListen(){ // يُستدعى مباشرة من ضغطة
+  wantListen=true;
+  if(dict){dict.start({language:'ar'}).catch(e=>{wantListen=false;toast(e.code==='not_granted'?'لم يُسمح بالفحص الصوتي':'تعذّر تشغيل الفحص ('+e.code+')')});return}
+  if(SR){if(sr)try{sr.abort()}catch(e){}
+    sr=new SR();sr.lang='ar-SA';sr.continuous=true;sr.interimResults=true;
+    sr.onresult=e=>{let part='';for(let i=e.resultIndex;i<e.results.length;i++){const r=e.results[i];if(r.isFinal){if(!fixOpen)feed(r[0].transcript)}else part+=r[0].transcript}$('heard').textContent=part?'🗣️ '+part:''};
+    sr.onend=()=>{listening=false;if(wantListen)try{sr.start();listening=true}catch(e){}};
+    sr.onerror=e=>{if(e.error==='not-allowed'){wantListen=false;toast('لم يُسمح بالفحص الصوتي')}};
+    try{sr.start();listening=true}catch(e){}
+  }
+}
+function stopListen(){wantListen=false;if(dict)dict.stop().catch(()=>{});if(sr)try{sr.stop()}catch(e){};$('heard').textContent=''}
+
+/* ===== الميكروفون والتسجيل ===== */
+let stream=null,actx=null,analyser=null,source=null,recorder=null,chunks=[],startT=0,elapsed=0,tick=null,practicing=false,downloads=null;
+(async()=>{try{if(window.claude&&claude.use)downloads=await claude.use('downloads')}catch(e){}})();
+async function openMic(){
+  if(!navigator.mediaDevices?.getUserMedia){showFallback('هذا المتصفح لا يدعم الميكروفون');return}
+  const dev=$('deviceSel').value;
+  try{
+    const s=await navigator.mediaDevices.getUserMedia({audio:{deviceId:dev?{exact:dev}:undefined,noiseSuppression:$('noise').checked,echoCancellation:$('echo').checked,autoGainControl:false,channelCount:1}});
+    if(stream)stream.getTracks().forEach(t=>t.stop());stream=s;setupAudio();
+    setStatus('ok','الميكروفون جاهز ✓');$('allowBtn').textContent='تم منح الإذن';$('allowBtn').disabled=true;
+    $('permHint').textContent='اختاري المشهد، ثم اضغطي الزر الأحمر. اتركي ثانية صمت قبل الكلام وبعده.';
+    $('recBtn').disabled=false;$('deviceSel').disabled=false;$('fallback').classList.remove('show');listDevices();
+  }catch(err){showFallback(err.name==='NotFoundError'?'لم يُعثر على ميكروفون':'تم رفض الإذن، أو هذه الصفحة لا تسمح بالميكروفون')}
+}
+function showFallback(m){setStatus('bad',m);$('permHint').textContent='إن رفضتِ بالخطأ: افتحي إعدادات الموقع (رمز القفل بجانب العنوان) واسمحي بالميكروفون. ويمكنك الآن استخدام زر 📖 للتدريب على القراءة.';$('fallback').classList.add('show')}
+async function listDevices(){const d=(await navigator.mediaDevices.enumerateDevices()).filter(x=>x.kind==='audioinput'),sel=$('deviceSel'),c=stream?.getAudioTracks()[0].getSettings().deviceId;sel.innerHTML='';d.forEach((x,i)=>{const o=document.createElement('option');o.value=x.deviceId;o.textContent=x.label||'ميكروفون '+(i+1);if(x.deviceId===c)o.selected=true;sel.appendChild(o)})}
+function setupAudio(){actx=actx||new(window.AudioContext||window.webkitAudioContext)();if(actx.state==='suspended')actx.resume();if(source)source.disconnect();source=actx.createMediaStreamSource(stream);analyser=actx.createAnalyser();analyser.fftSize=2048;source.connect(analyser);draw()}
+let raf;function draw(){cancelAnimationFrame(raf);const c=$('wave'),g=c.getContext('2d'),b=new Float32Array(analyser.fftSize);const L=()=>{analyser.getFloatTimeDomainData(b);let pk=0;for(const v of b)pk=Math.max(pk,Math.abs(v));$('level').style.width=Math.min(100,pk*140)+'%';g.fillStyle='#100d0b';g.fillRect(0,0,c.width,c.height);g.strokeStyle=recorder?.state==='recording'?'#e2483d':'#f0a35e';g.lineWidth=3;g.beginPath();const st=c.width/b.length;for(let i=0;i<b.length;i++){const y=c.height/2+b[i]*c.height*.9;i?g.lineTo(i*st,y):g.moveTo(0,y)}g.stroke();raf=requestAnimationFrame(L)};L()}
+function pickMime(){for(const m of['audio/webm;codecs=opus','audio/webm','audio/mp4'])if(window.MediaRecorder?.isTypeSupported?.(m))return m;return''}
+const isBusy=()=>practicing||(recorder&&recorder.state!=='inactive');
+function runClock(){clearInterval(tick);tick=setInterval(()=>{const ms=elapsed+(running()?performance.now()-startT:0);const t=$('timer');t.textContent=fmt(ms);const s=ms/1000;t.className='timer'+(s>cur.max?' over':s>cur.max-4?' near':'');
+  document.querySelectorAll('.seg').forEach((el,i,a)=>{const nx=a[i+1]?+a[i+1].dataset.t:1e9;el.classList.toggle('now',s>=+el.dataset.t-0.3&&s<nx-0.3)});
+  if(s>cur.max&&!t._warned){t._warned=true;toast('تجاوزتِ أقصى مدة للمشهد ('+cur.max+' ث)')}},100)}
+let isRunning=false;const running=()=>isRunning;
+function startRec(){
+  const m=pickMime();try{recorder=new MediaRecorder(stream,m?{mimeType:m,audioBitsPerSecond:128000}:undefined)}catch(e){toast('المتصفح لا يدعم التسجيل');return}
+  if($('checkOn').checked&&(dict||SR))startListen();
+  resetChecker();chunks=[];elapsed=0;$('timer')._warned=false;
+  recorder.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};
+  recorder.onstop=()=>{if(recorder._discard)return;addTake(new Blob(chunks,{type:recorder.mimeType||m||'audio/webm'}),elapsed)};
+  recorder.start(250);startT=performance.now();isRunning=true;runClock();
+  $('recBtn').classList.add('on');$('onair').classList.add('live');$('pauseBtn').disabled=false;$('practiceBtn').disabled=true;$('prompter').classList.add('rec-mode');
+}
+function stopRec(discard){
+  if(isRunning)elapsed+=performance.now()-startT;isRunning=false;clearInterval(tick);recorder._discard=!!discard;recorder.stop();stopListen();
+  $('recBtn').classList.remove('on');$('onair').classList.remove('live');$('pauseBtn').disabled=true;$('pauseBtn').textContent='⏸';$('practiceBtn').disabled=!(dict||SR);$('prompter').classList.remove('rec-mode');
+  if(!discard&&$('checkOn').checked&&(dict||SR)){toast(errors.length?'انتهى التسجيل مع '+errors.length+' ملاحظة — راجعي الكلمات الحمراء':'انتهى التسجيل — لم تُكتشف أخطاء ✓')}
+}
+function pauseRec(){if(recorder?.state==='recording'){recorder.pause();elapsed+=performance.now()-startT;isRunning=false;$('pauseBtn').textContent='▶';$('onair').classList.remove('live')}}
+function resumeRec(){if(recorder?.state==='paused'){recorder.resume();startT=performance.now();isRunning=true;$('pauseBtn').textContent='⏸';$('onair').classList.add('live')}}
+function pauseForFix(){if(recorder?.state==='recording')pauseRec();if(practicing){/* يبقى الاستماع ولكن يُتجاهل حتى المتابعة */}}
+$('recBtn').onclick=()=>{if(recorder&&recorder.state!=='inactive')stopRec();else startRec()};
+$('pauseBtn').onclick=()=>{if(recorder?.state==='recording')pauseRec();else{hideFix();resumeRec()}};
+$('fixContinue').onclick=()=>{hideFix();pending=[];markCur();resumeRec();toast('أكملي من الكلمة المظلّلة')};
+$('fixRedo').onclick=()=>{hideFix();if(recorder&&recorder.state!=='inactive'){stopRec(true);toast('أُلغي التسجيل — اضغطي الزر الأحمر للبدء من جديد')}else{resetChecker()}};
+$('practiceBtn').onclick=()=>{
+  if(practicing){practicing=false;stopListen();isRunning=false;clearInterval(tick);$('practiceBtn').style.background='';$('recBtn').disabled=!stream;$('prompter').classList.remove('rec-mode');toast(errors.length?'انتهى التدريب: '+errors.length+' ملاحظة':'انتهى التدريب — قراءة سليمة ✓');return}
+  startListen();practicing=true;resetChecker();elapsed=0;startT=performance.now();isRunning=true;$('timer')._warned=false;runClock();
+  $('practiceBtn').style.background='#4a3a2c';$('recBtn').disabled=true;$('prompter').classList.add('rec-mode');toast('وضع التدريب: اقرئي النص وسأتوقف عند الأخطاء');
+};
+$('allowBtn').onclick=openMic;
+['deviceSel','noise','echo'].forEach(i=>$(i).addEventListener('change',()=>{if(stream&&!isBusy())openMic()}));
+
+/* ===== التسجيلات ===== */
+const extFor=t=>/mp4|m4a|aac/.test(t)?'mp4':/ogg/.test(t)?'ogg':/mpeg/.test(t)?'mp3':'webm';
+function addTake(blob,ms,sceneId){
+  const s=sceneId?SCENES.find(x=>x.id===sceneId):cur;
+  takeCount[s.id]=(takeCount[s.id]||0)+1;const n=takeCount[s.id];
+  (takes[s.id]=takes[s.id]||[]).push({ms,blob});
+  const box=$('takes');box.querySelector('p.muted')?.remove();
+  const url=URL.createObjectURL(blob),el=document.createElement('div');el.className='take';
+  const over=ms&&ms/1000>s.max;
+  el.innerHTML=`<div class="take-head"><input class="take-name" value="${s.id}${n>1?'_'+n:''}"><small class="${over?'over':''}">${ms?fmt(ms)+' / '+fmtS(s.max):''}${over?' ⚠️ أطول من المسموح':''} · ${(blob.size/1048576).toFixed(2)} MB</small></div><audio controls src="${url}"></audio><div class="row take-actions"><button data-a="dl">⬇️ تنزيل</button><button data-a="del">🗑 حذف</button></div>`;
+  const ref=takes[s.id][takes[s.id].length-1];
+  el.querySelector('[data-a=del]').onclick=()=>{URL.revokeObjectURL(url);el.remove();takes[s.id]=takes[s.id].filter(x=>x!==ref);renderChips();renderPlan()};
+  el.querySelector('[data-a=dl]').onclick=async()=>{const f=(el.querySelector('.take-name').value||s.id).trim()+'.'+extFor(blob.type);
+    if(downloads){try{await downloads.save({filename:f,data:blob});toast('تم الحفظ ✓')}catch(e){toast(e?.code==='declined'?'تم إلغاء الحفظ':e?.code==='rejected_extension'?'هذه الصيغة لا يمكن حفظها من هنا':'تعذّر الحفظ')}}
+    else{const a=document.createElement('a');a.href=url;a.download=f;document.body.appendChild(a);a.click();a.remove()}};
+  box.prepend(el);renderChips();renderPlan();toast('أُضيف تسجيل المشهد '+s.id);
+}
+$('fileIn').onchange=e=>{const f=e.target.files[0];if(!f)return;const a=new Audio(URL.createObjectURL(f));a.onloadedmetadata=()=>addTake(f,isFinite(a.duration)?a.duration*1000:0);a.onerror=()=>addTake(f,0);e.target.value=''};
+function renderPlan(){
+  let h='<tr><th>المشهد</th><th>النوع</th><th>أقصى مدة</th><th>مدة آخر تسجيل</th></tr>';
+  SCENES.forEach(s=>{const t=takes[s.id]?.at(-1);const over=t&&t.ms/1000>s.max;h+=`<tr><td>${s.id}</td><td>${s.core?'★ أساسي':'اختياري'}</td><td class="l">${fmtS(s.max)}</td><td class="l" style="color:${!t?'var(--muted)':over?'var(--accent)':'var(--ok)'}">${t&&t.ms?fmtS(t.ms/1000)+(over?' ⚠️':' ✓'):t?'✓':'—'}</td></tr>`});
+  $('plan').innerHTML=h;
+}
+$('copyPlan').onclick=()=>{const txt=SCENES.map(s=>{const t=takes[s.id]?.at(-1);return s.id+'\t'+(s.core?'أساسي':'اختياري')+'\t'+fmtS(s.max)+'\t'+(t&&t.ms?fmtS(t.ms/1000):'—')}).join('\n');navigator.clipboard.writeText('المشهد\tالنوع\tأقصى مدة\tالمدة\n'+txt).then(()=>toast('نُسخ الجدول ✓'),()=>toast('تعذّر النسخ'))};
+
+renderScene();renderPlan();updateCheckNote();
+</script>
+</body>
+</html>
