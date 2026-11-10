@@ -189,6 +189,7 @@
   <section class="panel" id="allTakes">
     <div class="row" style="justify-content:space-between"><h2 style="margin:0">📁 كل التسجيلات</h2><button id="syncBadge" class="badge" title="اضغطي للتحديث"></button></div>
     <div id="progress" class="progress"></div>
+    <div id="syncLine" class="muted" style="font-size:12px"></div>
     <details id="addBox" class="addbox"><summary>➕ إضافة تسجيل من ملف (مثل تسجيلات البنات)</summary>
       <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
         <label class="muted">المشهد<select id="addScene" class="field"></select></label>
@@ -580,13 +581,13 @@ try{
 if(sync)invite=null; // صاحبة الاستديو لا تحتاج رابط الدعوة
 document.body.classList.toggle('invited',!!invite);
 let chain=Promise.resolve();const queue=fn=>chain=chain.then(fn).catch(e=>{setSync('bad','تعذّرت المزامنة: '+e.message)});
-function setSync(state,msg){const b=$('syncBadge');b.className='badge'+(state==='ok'?' on':'');b.textContent=state==='ok'?'☁️ متزامن':state==='busy'?'⏳ يزامن…':state==='bad'?'⚠️ مشكلة في المزامنة':'📱 هذا الجهاز فقط';if(msg)$('syncMsg').textContent=msg}
+function setSync(state,msg){if(state==='bad'){toast(msg||'مشكلة في المزامنة');$('syncLine').innerHTML='<span style="color:var(--accent)">⚠️ '+(msg||'')+'</span>'}else if(state==='ok'&&sync)$('syncLine').textContent='☁️ مربوط بـ '+sync.repo+(inbox?' · 📥 صندوق البنات مربوط':'')+' · نسخة 8';else if(invite)$('syncLine').textContent='📤 مربوطة بصندوق جمانه · نسخة 8';else $('syncLine').textContent='📱 المزامنة غير مربوطة على هذا الجهاز · نسخة 8';const b=$('syncBadge');b.className='badge'+(state==='ok'?' on':'');b.textContent=state==='ok'?'☁️ متزامن':state==='busy'?'⏳ يزامن…':state==='bad'?'⚠️ مشكلة في المزامنة':'📱 هذا الجهاز فقط';if(msg)$('syncMsg').textContent=msg}
 async function gh(path,{method='GET',body,raw,cfg}={}){
   cfg=cfg||sync;
   const r=await fetch('https://api.github.com/repos/'+cfg.repo+path,{method,headers:{Authorization:'Bearer '+cfg.token,Accept:raw?'application/vnd.github.raw+json':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'},body:body?JSON.stringify(body):undefined,cache:'no-store'});
   if(r.status===404)return null;
   if(r.status===401)throw new Error('الرمز غير صالح أو انتهت صلاحيته');
-  if(r.status===403)throw new Error('الرمز لا يملك صلاحية الكتابة على المستودع');
+  if(r.status===403)throw new Error('الرمز لا يملك صلاحية الكتابة (Contents: Read and write) على '+cfg.repo);
   if(!r.ok)throw new Error('خطأ '+r.status);
   return r;
 }
