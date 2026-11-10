@@ -123,7 +123,7 @@
     <div id="onair" class="onair">ON AIR</div>
   </header>
   <section class="panel invite-bar" id="inviteBar">
-    <p style="margin:0 0 8px">👋 أهلًا! تسجيلاتك تُرسل تلقائيًا إلى جمانه. اكتبي اسمك أولًا عشان يوصل كل تسجيل باسمك:</p>
+    <p style="margin:0 0 8px">👋 أهلًا! تسجيلاتك تُرسل تلقائيًا إلى جمانه، وتقدرين تسمعين كل تسجيلات المشروع في «📁 كل التسجيلات» تحت. اكتبي اسمك أولًا عشان يوصل كل تسجيل باسمك:</p>
     <input id="inviteName" class="field" placeholder="اسمك">
   </section>
   <section class="panel share-bar" id="shareBar">
@@ -678,7 +678,7 @@ try{$('inviteName').value=localStorage.getItem('studio-me')||''}catch(e){}
 $('inviteName').onchange=()=>{const v=$('inviteName').value.trim();try{localStorage.setItem('studio-me',v)}catch(e){};$('myName').value=v;toast('أهلًا '+v+' 🌷')};
 $('syncNow').onclick=()=>{if(!sync){$('syncBox').open=true;$('syncMsg').textContent='اربطي المزامنة أولًا';return}pull()};
 $('syncOff').onclick=()=>{localStorage.removeItem('studio-sync');sync=null;setSync('off','فُصل هذا الجهاز. تسجيلاتك تبقى عليه وعلى المستودع.');renderAll()};
-document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&sync&&!isBusy())pull()});
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState!=='visible'||isBusy())return;if(sync)pull();else pullPublic()});
 setSync(sync?'ok':'off');
 $('fileIn').onchange=e=>{const f=e.target.files[0];if(!f)return;const a=new Audio(URL.createObjectURL(f));a.onloadedmetadata=()=>addTake(f,isFinite(a.duration)?a.duration*1000:0);a.onerror=()=>addTake(f,0);e.target.value=''};
 function renderPlan(){
