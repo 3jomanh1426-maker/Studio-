@@ -88,6 +88,18 @@
   .fallback input{display:none}
   .toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#2b2521;border:1px solid var(--line);padding:10px 16px;border-radius:10px;font-size:14px;opacity:0;transition:.25s;pointer-events:none;z-index:9;max-width:90vw}
   .toast.show{opacity:1}
+  .badge{font-size:12px;padding:4px 9px;border-radius:999px;background:#2b2521;color:var(--muted)}
+  .badge.on{background:#1f3320;color:var(--ok)}
+  .done-badge{font-size:13px;margin:2px 0 6px;color:var(--muted)}
+  .done-badge.yes{color:var(--ok);font-weight:700}
+  .progress{font-size:13px;color:var(--muted);margin:6px 0 4px}
+  .grp{margin-top:12px;border:1px solid var(--line);border-radius:12px;padding:8px 12px}
+  .grp-h{display:flex;justify-content:space-between;align-items:center;font-size:14px;font-weight:700}
+  .grp-h .ok{color:var(--ok);font-size:12px}
+  .grp.empty{opacity:.55}
+  .grp.empty .grp-h .ok{color:var(--muted)}
+  .cloud{font-size:11px;color:var(--muted)} .cloud.ok{color:var(--ok)} .cloud.bad{color:var(--warn)}
+  .field{font-family:inherit;font-size:14px;background:#100d0b;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:9px;width:100%}
   details summary{cursor:pointer;color:var(--muted);font-size:13px}
 </style>
 </head>
@@ -111,6 +123,7 @@
   <section class="panel">
     <div class="scenes" id="scenes"></div>
     <div class="scene-title"><b id="sceneName"></b><span id="sceneMeta"></span></div>
+    <div id="sceneDone" class="done-badge"></div>
     <div id="prompter" class="prompter"></div>
     <div id="tipbox" class="tipbox"></div>
   </section>
@@ -148,16 +161,29 @@
     <p class="muted" id="checkNote" style="margin-top:8px"></p>
   </section>
 
-  <section class="panel">
-    <h2>التسجيلات</h2>
+  <section class="panel" id="allTakes">
+    <div class="row" style="justify-content:space-between"><h2 style="margin:0">📁 كل التسجيلات</h2><button id="syncBadge" class="badge" title="اضغطي للتحديث"></button></div>
+    <div id="progress" class="progress"></div>
     <div id="takes"><p class="muted">لا توجد تسجيلات بعد.</p></div>
+  </section>
+
+  <section class="panel">
+    <details id="syncBox"><summary>☁️ المزامنة بين الأجهزة</summary>
+      <p class="muted" style="margin-top:8px">لتظهر تسجيلاتك على كل أجهزتك، تُرفع إلى مستودع خاص في حسابك على GitHub. أدخلي الرمز مرة واحدة على كل جهاز.</p>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
+        <input id="syncRepo" class="field" dir="ltr" value="3jomanh1426-maker/studio-recordings" placeholder="owner/repo">
+        <input id="syncToken" class="field" dir="ltr" type="password" placeholder="github_pat_...">
+        <div class="row"><button id="syncSave" class="primary">ربط</button><button id="syncNow">تحديث الآن</button><button id="syncOff">فصل هذا الجهاز</button></div>
+        <p class="muted" id="syncMsg"></p>
+      </div>
+    </details>
   </section>
 
   <section class="panel">
     <h2>جدول المدد</h2>
     <table id="plan"></table>
     <div class="row" style="margin-top:8px"><button id="copyPlan">نسخ الجدول</button></div>
-    <p class="muted" style="margin-top:6px">تسجيلاتك تُحفظ في هذه الصفحة على هذا الجهاز وتبقى بعد إغلاقها. للاحتياط نزّلي النسخة النهائية من كل مشهد.</p>
+    <p class="muted" style="margin-top:6px">تسجيلاتك تُحفظ في الصفحة وتبقى بعد إغلاقها، وتظهر على كل أجهزتك بعد تفعيل المزامنة.</p>
   </section>
 </main>
 <div id="toast" class="toast"></div>
@@ -249,7 +275,7 @@ function strip(w){return w.replace(/^(وال|فال|بال|كال|لل|ال|و|�
 function similar(a,b){if(a===b)return true;const A=strip(a),B=strip(b);if(A===B&&A.length>=2)return true;const L=Math.max(A.length,B.length);if(L<4)return false;return 1-lev(A,B)/L>=0.72}
 
 /* ===== بناء الملقّن ===== */
-let cur=SCENES[0], tokens=[], takes={}, takeCount={};
+let cur=SCENES[0], tokens=[], takes={};
 function renderChips(){
   $('scenes').innerHTML='';
   SCENES.forEach(s=>{const b=document.createElement('button');b.className='chip'+(s.core?'':' opt')+(s===cur?' sel':'')+(takes[s.id]?.length?' done':'');
@@ -275,7 +301,7 @@ function renderScene(){
     });
     p.appendChild(seg);
   });
-  $('tipbox').classList.remove('show');resetChecker();$('timer').textContent='00:00.0';$('timer').className='timer';
+  $('tipbox').classList.remove('show');resetChecker();if(typeof renderDone==='function'&&window._ready)renderDone();$('timer').textContent='00:00.0';$('timer').className='timer';
 }
 function showTip(w,n){const b=$('tipbox');b.innerHTML='🔤 <b style="font-family:Noto Naskh Arabic;font-size:18px">'+w+'</b> — '+n;b.classList.add('show')}
 $('fontSize').oninput=e=>$('prompter').style.fontSize=e.target.value+'px';$('prompter').style.fontSize='24px';
@@ -406,48 +432,127 @@ $('allowBtn').onclick=openMic;
 
 /* ===== التسجيلات ===== */
 const extFor=t=>/mp4|m4a|aac/.test(t)?'mp4':/ogg/.test(t)?'ogg':/mpeg/.test(t)?'mp3':'webm';
-/* ===== الحفظ داخل الصفحة (IndexedDB) ===== */
+/* ===== التسجيلات: حفظ محلي + مزامنة ===== */
+let recs=[], blobs={};
+function regroup(){takes={};recs.forEach(r=>(takes[r.scene]=takes[r.scene]||[]).push(r));Object.values(takes).forEach(a=>a.sort((x,y)=>x.created-y.created))}
 let dbP=null;
 function db(){if(!dbP)dbP=new Promise((res,rej)=>{try{const r=indexedDB.open('studio-takes',1);r.onupgradeneeded=()=>r.result.createObjectStore('takes',{keyPath:'id'});r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)}catch(e){rej(e)}});return dbP}
 async function dbDo(mode,fn){const d=await db();return new Promise((res,rej)=>{const tx=d.transaction('takes',mode),st=tx.objectStore('takes');const r=fn(st);tx.oncomplete=()=>res(r&&r.result);tx.onerror=()=>rej(tx.error)})}
 const dbPut=rec=>dbDo('readwrite',st=>st.put(rec));
 const dbDel=id=>dbDo('readwrite',st=>st.delete(id));
 const dbAll=()=>dbDo('readonly',st=>st.getAll());
+async function saveLocal(rec){const blob=blobs[rec.id];const copy={...rec,buf:await blob.arrayBuffer()};await dbPut(copy)}
+async function saveMeta(rec){try{const all=await dbAll();const r=all.find(x=>x.id===rec.id);if(r){Object.assign(r,rec);await dbPut(r)}}catch(e){}}
+
 async function addTake(blob,ms,sceneId){
   const s=sceneId?SCENES.find(x=>x.id===sceneId):cur;
   const n=(takes[s.id]?.length||0)+1;
-  const rec={id:Date.now()+'-'+Math.random().toString(36).slice(2,7),scene:s.id,name:s.id+(n>1?'_'+n:''),ms,type:blob.type||'audio/mp4',created:Date.now()};
-  showTake(rec,blob,true);
-  try{rec.buf=await blob.arrayBuffer();await dbPut(rec);delete rec.buf;toast('حُفظ تسجيل المشهد '+s.id+' في الصفحة ✓')}
-  catch(e){toast('أُضيف التسجيل، لكن تعذّر حفظه في الصفحة — نزّليه')}
+  const rec={id:Date.now()+'-'+Math.random().toString(36).slice(2,7),scene:s.id,name:s.id+(n>1?'_'+n:''),ms,type:blob.type||'audio/mp4',created:Date.now(),synced:false};
+  blobs[rec.id]=blob;recs.push(rec);regroup();renderAll();
+  toast('✅ تم تسجيل المشهد '+s.id);
+  try{await saveLocal(rec)}catch(e){toast('تعذّر الحفظ في الصفحة — نزّلي التسجيل')}
+  if(sync)queue(()=>upload(rec));
 }
-function showTake(rec,blob,isNew){
-  const s=SCENES.find(x=>x.id===rec.scene)||cur;
-  (takes[s.id]=takes[s.id]||[]).push(rec);
-  const box=$('takes');box.querySelector('p.muted')?.remove();
-  const url=URL.createObjectURL(blob),el=document.createElement('div');el.className='take';
-  const ms=rec.ms,over=ms&&ms/1000>s.max;
-  const date=new Date(rec.created).toLocaleString('ar-SA',{weekday:'short',hour:'numeric',minute:'2-digit'});
-  el.innerHTML=`<div class="take-head"><input class="take-name"><small class="${over?'over':''}">${ms?fmt(ms)+' / '+fmtS(s.max):''}${over?' ⚠️ أطول من المسموح':''} · ${(blob.size/1048576).toFixed(2)} MB</small></div><small style="color:var(--muted)">${date}</small><audio controls src="${url}"></audio><div class="row take-actions"><button data-a="dl">⬇️ تنزيل</button><button data-a="del">🗑 حذف</button></div>`;
+const urls={};
+function urlFor(id){return urls[id]||(urls[id]=URL.createObjectURL(blobs[id]))}
+function renderAll(){
+  renderChips();renderPlan();renderDone();
+  const box=$('takes');box.innerHTML='';
+  const doneCore=SCENES.filter(s=>s.core&&takes[s.id]?.length).length,coreN=SCENES.filter(s=>s.core).length;
+  $('progress').textContent='تم تسجيل '+doneCore+' من '+coreN+' مشاهد أساسية · مجموع التسجيلات: '+recs.length;
+  SCENES.forEach(s=>{
+    const list=takes[s.id]||[];
+    const g=document.createElement('div');g.className='grp'+(list.length?'':' empty');
+    g.innerHTML=`<div class="grp-h"><span>${s.core?'★ ':''}المشهد ${s.id} — ${s.name}</span><span class="ok">${list.length?'✅ تم التسجيل'+(list.length>1?' ('+list.length+')':''):'لم يُسجّل بعد'}</span></div>`;
+    [...list].reverse().forEach(rec=>g.appendChild(takeEl(rec,s)));
+    box.appendChild(g);
+  });
+}
+function renderDone(){const n=takes[cur.id]?.length||0;const d=$('sceneDone');d.className='done-badge'+(n?' yes':'');d.textContent=n?'✅ تم تسجيل هذا الجزء'+(n>1?' ('+n+' تسجيلات)':''):'⏺ لم يُسجّل هذا الجزء بعد'}
+function takeEl(rec,s){
+  const el=document.createElement('div');el.className='take';
+  const ms=rec.ms,over=ms&&ms/1000>s.max,blob=blobs[rec.id];
+  const date=new Date(rec.created).toLocaleString('ar-SA',{day:'numeric',month:'short',hour:'numeric',minute:'2-digit'});
+  const cloud=!sync?'<span class="cloud">📱 على هذا الجهاز</span>':rec.synced?'<span class="cloud ok">☁️ على كل الأجهزة</span>':'<span class="cloud bad">⏳ لم يُرفع بعد</span>';
+  el.innerHTML=`<div class="take-head"><input class="take-name"><small class="${over?'over':''}">${ms?fmt(ms)+' / '+fmtS(s.max):''}${over?' ⚠️':''}</small></div><div class="row" style="justify-content:space-between"><small style="color:var(--muted)">${date}</small>${cloud}</div><audio controls preload="metadata" src="${urlFor(rec.id)}"></audio><div class="row take-actions"><button data-a="dl">⬇️ تنزيل</button><button data-a="del">🗑 حذف</button></div>`;
   const nm=el.querySelector('.take-name');nm.value=rec.name;
-  nm.onchange=async()=>{rec.name=nm.value.trim()||rec.scene;try{const all=await dbAll();const r=all.find(x=>x.id===rec.id);if(r){r.name=rec.name;await dbPut(r)}}catch(e){}};
-  el.querySelector('[data-a=del]').onclick=()=>{
-    if(el._confirm!==true){el._confirm=true;el.querySelector('[data-a=del]').textContent='اضغطي مرة ثانية للتأكيد';setTimeout(()=>{el._confirm=false;const b=el.querySelector('[data-a=del]');if(b)b.textContent='🗑 حذف'},3000);return}
-    URL.revokeObjectURL(url);el.remove();takes[s.id]=takes[s.id].filter(x=>x!==rec);dbDel(rec.id).catch(()=>{});
-    if(!box.children.length)box.innerHTML='<p class="muted">لا توجد تسجيلات بعد.</p>';renderChips();renderPlan()};
+  nm.onchange=()=>{rec.name=nm.value.trim()||rec.scene;saveMeta(rec);if(sync&&rec.synced)queue(()=>indexEdit(ix=>{const e=ix.find(x=>x.id===rec.id);if(e)e.name=rec.name}))};
+  const del=el.querySelector('[data-a=del]');
+  del.onclick=()=>{
+    if(!el._c){el._c=true;del.textContent='اضغطي مرة ثانية للتأكيد';setTimeout(()=>{el._c=false;del.textContent='🗑 حذف'},3000);return}
+    removeLocal(rec.id);renderAll();if(sync&&rec.synced)queue(()=>removeRemote(rec));toast('حُذف التسجيل')};
   el.querySelector('[data-a=dl]').onclick=async()=>{const f=(nm.value||s.id).trim()+'.'+extFor(blob.type||rec.type);
     if(downloads){try{await downloads.save({filename:f,data:blob});toast('تم الحفظ ✓')}catch(e){toast(e?.code==='declined'?'تم إلغاء الحفظ':'تعذّر الحفظ')}}
-    else{const a=document.createElement('a');a.href=url;a.download=f;document.body.appendChild(a);a.click();a.remove()}};
-  box.prepend(el);renderChips();renderPlan();
+    else{const a=document.createElement('a');a.href=urlFor(rec.id);a.download=f;document.body.appendChild(a);a.click();a.remove()}};
+  return el;
 }
+function removeLocal(id){recs=recs.filter(r=>r.id!==id);if(urls[id]){URL.revokeObjectURL(urls[id]);delete urls[id]}delete blobs[id];regroup();dbDel(id).catch(()=>{})}
 async function loadSaved(){
-  try{
-    const all=(await dbAll()).sort((a,b)=>a.created-b.created);
-    all.forEach(r=>showTake(r,new Blob([r.buf],{type:r.type})));
-    if(all.length)toast('رجعت تسجيلاتك المحفوظة ('+all.length+')');
-    if(navigator.storage?.persist)navigator.storage.persist().catch(()=>{});
-  }catch(e){}
+  try{const all=(await dbAll()).sort((a,b)=>a.created-b.created);all.forEach(r=>{blobs[r.id]=new Blob([r.buf],{type:r.type});delete r.buf;recs.push(r)});regroup();renderAll();
+    if(navigator.storage?.persist)navigator.storage.persist().catch(()=>{})}catch(e){renderAll()}
+  if(sync)pull();
 }
+
+/* ===== المزامنة عبر GitHub ===== */
+let sync=null;try{sync=JSON.parse(localStorage.getItem('studio-sync')||'null')}catch(e){}
+let chain=Promise.resolve();const queue=fn=>chain=chain.then(fn).catch(e=>{setSync('bad','تعذّرت المزامنة: '+e.message)});
+function setSync(state,msg){const b=$('syncBadge');b.className='badge'+(state==='ok'?' on':'');b.textContent=state==='ok'?'☁️ متزامن':state==='busy'?'⏳ يزامن…':state==='bad'?'⚠️ مشكلة في المزامنة':'📱 هذا الجهاز فقط';if(msg)$('syncMsg').textContent=msg}
+async function gh(path,{method='GET',body,raw}={}){
+  const r=await fetch('https://api.github.com/repos/'+sync.repo+path,{method,headers:{Authorization:'Bearer '+sync.token,Accept:raw?'application/vnd.github.raw+json':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'},body:body?JSON.stringify(body):undefined,cache:'no-store'});
+  if(r.status===404)return null;
+  if(r.status===401)throw new Error('الرمز غير صالح أو انتهت صلاحيته');
+  if(r.status===403)throw new Error('الرمز لا يملك صلاحية الكتابة على المستودع');
+  if(!r.ok)throw new Error('خطأ '+r.status);
+  return r;
+}
+function b64(buf){const u=new Uint8Array(buf);let s='';for(let i=0;i<u.length;i+=0x8000)s+=String.fromCharCode.apply(null,u.subarray(i,i+0x8000));return btoa(s)}
+const enc=t=>b64(new TextEncoder().encode(t));
+const dec=c=>new TextDecoder().decode(Uint8Array.from(atob(c.replace(/\n/g,'')),ch=>ch.charCodeAt(0)));
+async function getIndex(){const r=await gh('/contents/index.json');if(!r)return{list:[],sha:undefined};const j=await r.json();return{list:JSON.parse(dec(j.content)),sha:j.sha}}
+async function indexEdit(fn){for(let t=0;t<3;t++){const {list,sha}=await getIndex();fn(list);try{await gh('/contents/index.json',{method:'PUT',body:{message:'تحديث قائمة التسجيلات',content:enc(JSON.stringify(list,null,1)),sha}});return list}catch(e){if(t===2)throw e}}}
+async function upload(rec){
+  setSync('busy');
+  const path='recordings/'+rec.id+'.'+extFor(rec.type);
+  const exists=await gh('/contents/'+path);
+  if(!exists)await gh('/contents/'+path,{method:'PUT',body:{message:'تسجيل المشهد '+rec.scene,content:b64(await blobs[rec.id].arrayBuffer())}});
+  await indexEdit(list=>{if(!list.find(x=>x.id===rec.id))list.push({id:rec.id,scene:rec.scene,name:rec.name,ms:rec.ms,type:rec.type,created:rec.created,path})});
+  rec.synced=true;await saveMeta(rec);renderAll();setSync('ok');
+}
+async function removeRemote(rec){
+  setSync('busy');let path;
+  await indexEdit(list=>{const i=list.findIndex(x=>x.id===rec.id);if(i>=0){path=list[i].path;list.splice(i,1)}});
+  if(path){const r=await gh('/contents/'+path);if(r){const j=await r.json();await gh('/contents/'+path,{method:'DELETE',body:{message:'حذف تسجيل',sha:j.sha}})}}
+  setSync('ok');
+}
+function pull(){return queue(async()=>{
+  setSync('busy');
+  const {list}=await getIndex();const ids=new Set(list.map(x=>x.id));
+  recs.filter(r=>r.synced&&!ids.has(r.id)).forEach(r=>removeLocal(r.id)); // حُذف من جهاز آخر
+  for(const e of list){
+    const loc=recs.find(r=>r.id===e.id);
+    if(loc){if(loc.name!==e.name){loc.name=e.name;saveMeta(loc)}continue}
+    const r=await gh('/contents/'+e.path,{raw:true});if(!r)continue;
+    const rec={id:e.id,scene:e.scene,name:e.name,ms:e.ms,type:e.type,created:e.created,synced:true};
+    blobs[rec.id]=new Blob([await r.arrayBuffer()],{type:e.type});recs.push(rec);try{await saveLocal(rec)}catch(x){}
+  }
+  regroup();renderAll();
+  for(const r of recs.filter(r=>!r.synced))await upload(r); // ما سُجّل قبل الربط أو تعذّر رفعه
+  setSync('ok','آخر مزامنة: '+new Date().toLocaleTimeString('ar-SA',{hour:'numeric',minute:'2-digit'}));
+})}
+$('syncSave').onclick=async()=>{
+  const repo=$('syncRepo').value.trim(),token=$('syncToken').value.trim();
+  if(!/^[\w.-]+\/[\w.-]+$/.test(repo)||!token){$('syncMsg').textContent='أدخلي اسم المستودع والرمز';return}
+  sync={repo,token};$('syncMsg').textContent='جارٍ التحقق…';
+  try{const r=await gh('');if(!r)throw new Error('لم أجد المستودع — تأكدي من الاسم ومن أن الرمز يشمله');const j=await r.json();if(!j.permissions?.push)throw new Error('الرمز لا يملك صلاحية الكتابة (Contents: Read and write)');
+    if(!j.private&&!confirmPublic())return;
+    localStorage.setItem('studio-sync',JSON.stringify(sync));$('syncToken').value='';$('syncBox').open=false;toast('تم الربط ✓ — جارٍ المزامنة');renderAll();pull();
+  }catch(e){sync=null;setSync('off',e.message)}
+};
+function confirmPublic(){if($('syncSave')._pub)return true;$('syncSave')._pub=true;$('syncMsg').textContent='⚠️ هذا المستودع عام: أي أحد يقدر يسمع تسجيلاتك. اجعليه Private، أو اضغطي «ربط» مرة ثانية للمتابعة.';sync=null;return false}
+$('syncBadge').onclick=()=>$('syncNow').onclick();$('syncNow').onclick=()=>{if(!sync){$('syncBox').open=true;$('syncMsg').textContent='اربطي المزامنة أولًا';return}pull()};
+$('syncOff').onclick=()=>{localStorage.removeItem('studio-sync');sync=null;setSync('off','فُصل هذا الجهاز. تسجيلاتك تبقى عليه وعلى المستودع.');renderAll()};
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&sync&&!isBusy())pull()});
+setSync(sync?'ok':'off');
 $('fileIn').onchange=e=>{const f=e.target.files[0];if(!f)return;const a=new Audio(URL.createObjectURL(f));a.onloadedmetadata=()=>addTake(f,isFinite(a.duration)?a.duration*1000:0);a.onerror=()=>addTake(f,0);e.target.value=''};
 function renderPlan(){
   let h='<tr><th>المشهد</th><th>النوع</th><th>أقصى مدة</th><th>مدة آخر تسجيل</th></tr>';
@@ -456,7 +561,7 @@ function renderPlan(){
 }
 $('copyPlan').onclick=()=>{const txt=SCENES.map(s=>{const t=takes[s.id]?.at(-1);return s.id+'\t'+(s.core?'أساسي':'اختياري')+'\t'+fmtS(s.max)+'\t'+(t&&t.ms?fmtS(t.ms/1000):'—')}).join('\n');navigator.clipboard.writeText('المشهد\tالنوع\tأقصى مدة\tالمدة\n'+txt).then(()=>toast('نُسخ الجدول ✓'),()=>toast('تعذّر النسخ'))};
 
-renderScene();renderPlan();updateCheckNote();loadSaved();
+window._ready=true;renderScene();renderPlan();updateCheckNote();loadSaved();
 </script>
 </body>
 </html>
