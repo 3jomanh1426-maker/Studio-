@@ -181,9 +181,9 @@
 
   <section class="panel">
     <details id="syncBox"><summary>☁️ المزامنة بين الأجهزة</summary>
-      <p class="muted" style="margin-top:8px">لتظهر تسجيلاتك على كل أجهزتك، تُرفع إلى مستودع خاص في حسابك على GitHub. أدخلي الرمز مرة واحدة على كل جهاز.</p>
+      <p class="muted" style="margin-top:8px">لتظهر تسجيلاتك على كل أجهزتك وفي رابط المشاركة، تُرفع إلى مستودع Studio- في حسابك على GitHub. أدخلي الرمز مرة واحدة على كل جهاز.</p>
       <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
-        <input id="syncRepo" class="field" dir="ltr" value="3jomanh1426-maker/studio-recordings" placeholder="owner/repo">
+        <input id="syncRepo" class="field" dir="ltr" value="3jomanh1426-maker/Studio-" placeholder="owner/repo">
         <input id="syncToken" class="field" dir="ltr" type="password" placeholder="github_pat_...">
         <div class="row"><button id="syncSave" class="primary">ربط</button><button id="syncNow">تحديث الآن</button><button id="syncOff">فصل هذا الجهاز</button></div>
         <p class="muted" id="syncMsg"></p>
@@ -504,7 +504,7 @@ async function loadSaved(){
     if(navigator.storage?.persist)navigator.storage.persist().catch(()=>{})}catch(e){renderAll()}
   if(sync)pull();else pullPublic();
 }
-const PUBLIC_REPO='3jomanh1426-maker/studio-recordings';
+const PUBLIC_REPO='3jomanh1426-maker/Studio-';
 async function pullPublic(){
   try{
     const base='https://raw.githubusercontent.com/'+PUBLIC_REPO+'/HEAD/';
@@ -521,13 +521,13 @@ const LISTEN_URL=location.origin+location.pathname+'#listen';
 function applyMode(){document.body.classList.toggle('listen',location.hash==='#listen');if(window._ready&&typeof renderAll==='function')renderAll()}
 window.addEventListener('hashchange',applyMode);applyMode();
 $('shareBtn').onclick=async()=>{
-  $('shareMsg').innerHTML='الرابط: <span dir="ltr">'+LISTEN_URL+'</span><br>من يفتحه يرى التسجيلات ويسمعها فقط، بدون تعديل أو حذف. يحتاج أن يكون مستودع studio-recordings عامًا (Public).';
+  $('shareMsg').innerHTML='الرابط: <span dir="ltr">'+LISTEN_URL+'</span><br>من يفتحه يرى التسجيلات ويسمعها فقط، بدون تعديل أو حذف.';
   try{await navigator.clipboard.writeText(LISTEN_URL);toast('نُسخ رابط المشاركة ✓')}catch(e){}
   if(navigator.share)navigator.share({title:'تسجيلات رحلة ريال واحد',url:LISTEN_URL}).catch(()=>{});
 };
 
 /* ===== المزامنة عبر GitHub ===== */
-let sync=null;try{sync=JSON.parse(localStorage.getItem('studio-sync')||'null')}catch(e){}
+let sync=null;try{sync=JSON.parse(localStorage.getItem('studio-sync')||'null');if(sync&&/studio-recordings$/i.test(sync.repo)){sync.repo='3jomanh1426-maker/Studio-';localStorage.setItem('studio-sync',JSON.stringify(sync))}}catch(e){}
 let chain=Promise.resolve();const queue=fn=>chain=chain.then(fn).catch(e=>{setSync('bad','تعذّرت المزامنة: '+e.message)});
 function setSync(state,msg){const b=$('syncBadge');b.className='badge'+(state==='ok'?' on':'');b.textContent=state==='ok'?'☁️ متزامن':state==='busy'?'⏳ يزامن…':state==='bad'?'⚠️ مشكلة في المزامنة':'📱 هذا الجهاز فقط';if(msg)$('syncMsg').textContent=msg}
 async function gh(path,{method='GET',body,raw}={}){
@@ -577,7 +577,6 @@ $('syncSave').onclick=async()=>{
   if(!/^[\w.-]+\/[\w.-]+$/.test(repo)||!token){$('syncMsg').textContent='أدخلي اسم المستودع والرمز';return}
   sync={repo,token};$('syncMsg').textContent='جارٍ التحقق…';
   try{const r=await gh('');if(!r)throw new Error('لم أجد المستودع — تأكدي من الاسم ومن أن الرمز يشمله');const j=await r.json();if(!j.permissions?.push)throw new Error('الرمز لا يملك صلاحية الكتابة (Contents: Read and write)');
-    if(!j.private&&!confirmPublic())return;
     localStorage.setItem('studio-sync',JSON.stringify(sync));$('syncToken').value='';$('syncBox').open=false;toast('تم الربط ✓ — جارٍ المزامنة');renderAll();pull();
   }catch(e){sync=null;setSync('off',e.message)}
 };
