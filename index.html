@@ -354,8 +354,8 @@ function markCur(){tokens.forEach(t=>t.el.classList.remove('cur'));if(tokens[ptr
 function isContent(t){return t.n.length>=3&&!STOP.has(t.n)}
 function findAhead(w,from,span){for(let k=0;k<=span;k++){const t=tokens[from+k];if(!t)break;if(similar(w,t.n))return k}return -1}
 function feed(text){
-  const words=text.split(/\s+/).map(norm).filter(Boolean);
-  for(const w of words){
+  const raws=text.split(/\s+/).filter(w=>norm(w));
+  for(const raw of raws){const w=norm(raw);
     if(ptr>=tokens.length)break;
     const inSet=(S,n)=>S.has(n)||S.has(strip(n));
     if(/[0-9]/.test(w)){let k=0;while(tokens[ptr+k]&&inSet(NUMW,tokens[ptr+k].n)){good(ptr+k);k++}ptr+=k;pending=[];continue}
@@ -371,7 +371,7 @@ function feed(text){
       if(fixOpen){ptr=lastErrIdx;pending=[];markCur();break}
       good(ptr+k);ptr+=k+1;pending=[];
     }else{
-      pending.push(w);
+      pending.push(raw.replace(/[،.,:؛!?؟]/g,''));
       if(pending.length>=3){raise('lost',tokens[ptr],pending.join(' '));pending=[]}
     }
     markCur();
